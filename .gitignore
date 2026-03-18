@@ -1,0 +1,25 @@
+# .NET build output
+**/bin/
+**/obj/
+TestResults/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.rsuser
+*.suo
+
+# Node / Svelte generated output
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/dist/
+frontend/dist-ssr/
+
+# Logs and local env files
+*.log
+*.local
+
+# OS files
+.DS_Store
+Thumbs.db

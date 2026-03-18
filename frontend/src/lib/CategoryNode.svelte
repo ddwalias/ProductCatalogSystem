@@ -1,7 +1,8 @@
 <script lang="ts">
   import CategoryNode from './CategoryNode.svelte';
   import type { CategoryTreeItem } from './types';
-  import { GitBranch } from 'lucide-svelte';
+  import { GitBranch, ChevronRight, ChevronDown } from 'lucide-svelte';
+  import { slide } from 'svelte/transition';
 
   interface Props {
     category: CategoryTreeItem;
@@ -12,56 +13,70 @@
   }
 
   let { category, currentId, depth = 0, onSelect, onCreateChild }: Props = $props();
+
+  let isOpen = $state(true);
 </script>
 
-<div class="relative w-full">
-  <div class="group flex items-center justify-between py-2 px-3 hover:bg-slate-800/50 rounded-lg cursor-pointer transition-colors {currentId === category.id ? 'bg-indigo-500/10 shadow-sm border border-indigo-500/20' : 'border border-transparent'}"
+<div class="w-full">
+  <div class="group flex items-center justify-between py-1.5 px-2 hover:bg-muted/50 rounded-md cursor-pointer transition-colors {currentId === category.id ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
        onclick={() => onSelect(category)}>
     
-    <div class="flex items-center gap-3 overflow-hidden" style="padding-left: {depth * 1.5}rem;">
-      {#if depth > 0}
-        <!-- Tree line visual -->
-        <div class="absolute left-0 top-1/2 w-4 border-t border-slate-700/50" style="left: {(depth - 1) * 1.5 + 1}rem;"></div>
-        <div class="absolute top-0 bottom-1/2 border-l border-slate-700/50" style="left: {(depth - 1) * 1.5 + 1}rem;"></div>
-      {/if}
-      
+    <div class="flex items-center gap-2 overflow-hidden" style="padding-left: {depth * 1.2}rem;">
+      <button 
+        type="button"
+        class="p-0.5 hover:bg-muted rounded-md text-muted-foreground shrink-0 transition-colors {category.children.length === 0 ? 'invisible' : ''}"
+        onclick={(e) => { e.stopPropagation(); isOpen = !isOpen; }}
+        aria-label="Toggle children"
+      >
+        {#if isOpen}
+          <ChevronDown class="h-4 w-4" />
+        {:else}
+          <ChevronRight class="h-4 w-4" />
+        {/if}
+      </button>
+
       <div class="relative flex items-center shrink-0">
         {#if category.status === 'Inactive'}
-          <div class="w-2.5 h-2.5 rounded-full border-2 border-slate-600 bg-slate-800"></div>
+          <div class="w-2 h-2 rounded-full border border-muted-foreground/40 bg-muted"></div>
         {:else}
-          <div class="w-2.5 h-2.5 rounded-full bg-indigo-500"></div>
+          <div class="w-2 h-2 rounded-full bg-primary/70 shadow-[0_0_4px_rgba(var(--primary),0.3)]"></div>
         {/if}
       </div>
       
-      <div class="flex flex-col">
-        <span class="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors">{category.name}</span>
-        <span class="text-xs text-slate-500">{category.children.length} children · Ord {category.displayOrder}</span>
+      <div class="flex flex-col min-w-0">
+        <span class="text-sm font-medium truncate {currentId === category.id ? 'text-accent-foreground' : 'text-foreground'}">{category.name}</span>
       </div>
     </div>
 
     <!-- Actions, shown on hover -->
-    <button 
-      title="Add Child Category"
-      class="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-md transition-all z-10" 
-      onclick={(e) => { e.stopPropagation(); onCreateChild(category.id); }}
-    >
-      <GitBranch size={16} />
-    </button>
+    <div class="flex items-center gap-2 invisible group-hover:visible pr-1">
+      <span class="text-[10px] text-muted-foreground uppercase tracking-wider">{category.children.length} sub &middot; Ord {category.displayOrder}</span>
+      <button 
+        type="button"
+        title="Add Child Category"
+        class="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-md transition-colors p-1" 
+        onclick={(e) => { e.stopPropagation(); onCreateChild(category.id); }}
+        aria-label="Add child category"
+      >
+        <GitBranch class="h-3.5 w-3.5" />
+      </button>
+    </div>
   </div>
 
-  {#if category.children.length > 0}
-    <div class="relative mt-1">
-      {#each category.children as child (child.id)}
-        <CategoryNode
-          category={child}
-          currentId={currentId}
-          depth={depth + 1}
-          {onCreateChild}
-          {onSelect}
-        />
-      {/each}
-      <!-- Vertical line continuing for children -->
-      <div class="absolute top-0 bottom-4 border-l border-slate-700/50 pointer-events-none" style="left: {depth * 1.5 + 1}rem;"></div>
+  {#if category.children.length > 0 && isOpen}
+    <div transition:slide={{ duration: 150 }} class="relative mt-0.5">
+      <div class="absolute top-0 bottom-0 border-l border-border/60 pointer-events-none" style="left: {depth * 1.2 + 0.6 + 0.5}rem;"></div>
+      <div class="flex flex-col gap-0.5">
+        {#each category.children as child (child.id)}
+          <CategoryNode
+            category={child}
+            currentId={currentId}
+            depth={depth + 1}
+            {onCreateChild}
+            {onSelect}
+          />
+        {/each}
+      </div>
     </div>
   {/if}
 </div>

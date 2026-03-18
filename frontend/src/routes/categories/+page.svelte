@@ -19,7 +19,7 @@
   import * as Select from "$lib/components/ui/select/index.js";
 
   import { superForm, defaults } from "sveltekit-superforms";
-  import { zod } from "sveltekit-superforms/adapters";
+  import { zod4 } from "sveltekit-superforms/adapters";
   import { z } from "zod";
 
   const formSchema = z.object({
@@ -104,7 +104,7 @@
 
   const form = superForm(initialData, {
     SPA: true,
-    validators: zod(formSchema as any),
+    validators: zod4(formSchema as any),
     onUpdate({ form: f }) {
       if (f.valid) {
         const data = f.data as FormSchema;

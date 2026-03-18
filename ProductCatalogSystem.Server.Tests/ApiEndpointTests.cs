@@ -61,6 +61,21 @@ public sealed class ApiEndpointTests
     }
 
     [Fact]
+    public async Task GetProductByVersion_ShouldRejectNonPositiveVersion()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/products/1?version=0");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var payload = await response.Content.ReadFromJsonAsync<ValidationProblemResponse>();
+        payload.Should().NotBeNull();
+        payload!.Errors.Should().ContainKey("Version");
+        payload.Errors["Version"].Should().Contain("Version must be a positive integer.");
+    }
+
+    [Fact]
     public async Task CreateCategory_ShouldRejectOutOfRangeStatus()
     {
         await using var factory = new ApiWebApplicationFactory();

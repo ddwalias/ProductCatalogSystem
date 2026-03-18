@@ -14,7 +14,7 @@ public interface IProductReader
         ProductAutocompleteQuery query,
         CancellationToken cancellationToken);
 
-    Task<ProductDetailDto?> GetByIdAsync(long id, CancellationToken cancellationToken);
+    Task<ProductDetailDto?> GetByIdAsync(long id, int? version, CancellationToken cancellationToken);
 }
 
 public sealed class ProductReader(
@@ -136,12 +136,40 @@ public sealed class ProductReader(
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<ProductDetailDto?> GetByIdAsync(long id, CancellationToken cancellationToken)
+    public async Task<ProductDetailDto?> GetByIdAsync(long id, int? version, CancellationToken cancellationToken)
     {
-        return await dbContext.Products
-            .AsNoTracking()
-            .Where(product => product.Id == id)
-            .Select(product => new ProductDetailDto(
+        if (version is null)
+        {
+            return await ProjectProductDetail(
+                    dbContext.Products
+                        .AsNoTracking()
+                        .Where(product => product.Id == id),
+                    dbContext.Categories.AsNoTracking())
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        return await ProjectProductDetail(
+                dbContext.Products
+                    .TemporalAll()
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .Where(product => product.Id == id && product.VersionNumber == version.Value)
+                    .OrderByDescending(product => EF.Property<DateTime>(product, "ValidFromUtc")),
+                dbContext.Categories
+                    .IgnoreQueryFilters()
+                    .AsNoTracking())
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static IQueryable<ProductDetailDto> ProjectProductDetail(
+        IQueryable<Product> products,
+        IQueryable<Category> categories)
+    {
+        return
+            from product in products
+            join category in categories on product.CategoryId equals category.Id into categoryGroup
+            from category in categoryGroup.DefaultIfEmpty()
+            select new ProductDetailDto(
                 product.Id,
                 product.Name,
                 product.Description,
@@ -154,8 +182,7 @@ public sealed class ProductReader(
                 product.UpdatedAtUtc,
                 RowVersionConverter.Encode(product.RowVersion),
                 product.CategoryId,
-                product.Category.Name))
-            .FirstOrDefaultAsync(cancellationToken);
+                category == null ? string.Empty : category.Name);
     }
 
     private static IQueryable<Product> ApplySorting(IQueryable<Product> products, ProductListQuery query)

@@ -74,7 +74,7 @@ public sealed class ProductWriter(
                 product.CategoryId,
                 product.InventoryOnHand);
 
-            var dto = await productReader.GetByIdAsync(product.Id, cancellationToken);
+            var dto = await productReader.GetByIdAsync(product.Id, null, cancellationToken);
             return new ServiceResult<ProductDetailDto>(ResultStatus.Success, dto!);
         });
     }
@@ -154,7 +154,7 @@ public sealed class ProductWriter(
                 product.VersionNumber,
                 product.InventoryOnHand);
 
-            var dto = await productReader.GetByIdAsync(product.Id, cancellationToken);
+            var dto = await productReader.GetByIdAsync(product.Id, null, cancellationToken);
             return new ServiceResult<ProductDetailDto>(ResultStatus.Success, dto!);
         });
     }

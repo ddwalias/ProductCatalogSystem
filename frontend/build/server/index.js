@@ -1,6 +1,7 @@
-import { D as DevalueError, i as is_primitive, g as get_type, a as is_plain_object, e as enumerable_symbols, s as stringify_key, b as stringify_string, v as valid_array_indices, B as BROWSER, u as uneval } from './chunks/index2-CRKCN0LV.js';
-import { w as with_request_store, t as text_decoder, b as base64_decode, r as root, d as decode_pathname, n as normalize_path, a as disable_search, c as decode_params, v as validate_layout_server_exports, e as validate_layout_exports, f as validate_page_server_exports, g as validate_page_exports, h as text_encoder$1, i as resolve, m as make_trackable, j as get_relative_path, k as base64_encode } from './chunks/root-y1zgPQ5o.js';
-import { w as writable, r as readable } from './chunks/index-DbeJUNF5.js';
+import { b as browser, u as uneval } from './chunks/index2-BJx0jX4X.js';
+import { t as text_encoder, p as parse, s as stringify$1, a as set_app } from './chunks/app-Tgr-00F-.js';
+import { w as with_request_store, t as text_decoder, b as base64_decode, r as root, d as decode_pathname, n as normalize_path, a as disable_search, c as decode_params, v as validate_layout_server_exports, e as validate_layout_exports, f as validate_page_server_exports, g as validate_page_exports, h as text_encoder$1, i as resolve, m as make_trackable, j as get_relative_path, k as base64_encode } from './chunks/root-CfFML5z2.js';
+import { r as readable, w as writable } from './chunks/index-KDwDKJix.js';
 
 /** @import { StandardSchemaV1 } from '@standard-schema/spec' */
 
@@ -67,9 +68,6 @@ class ActionFailure {
 		this.data = data;
 	}
 }
-
-const text_encoder = new TextEncoder();
-new TextDecoder();
 
 /** @import { StandardSchemaV1 } from '@standard-schema/spec' */
 
@@ -218,710 +216,6 @@ function override(paths) {
 function reset() {
   base = initial.base;
   assets = initial.assets;
-}
-
-/**
- * Base64 Encodes an arraybuffer
- * @param {ArrayBuffer} arraybuffer
- * @returns {string}
- */
-function encode64(arraybuffer) {
-  const dv = new DataView(arraybuffer);
-  let binaryString = "";
-
-  for (let i = 0; i < arraybuffer.byteLength; i++) {
-    binaryString += String.fromCharCode(dv.getUint8(i));
-  }
-
-  return binaryToAscii(binaryString);
-}
-
-/**
- * Decodes a base64 string into an arraybuffer
- * @param {string} string
- * @returns {ArrayBuffer}
- */
-function decode64(string) {
-  const binaryString = asciiToBinary(string);
-  const arraybuffer = new ArrayBuffer(binaryString.length);
-  const dv = new DataView(arraybuffer);
-
-  for (let i = 0; i < arraybuffer.byteLength; i++) {
-    dv.setUint8(i, binaryString.charCodeAt(i));
-  }
-
-  return arraybuffer;
-}
-
-const KEY_STRING =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-/**
- * Substitute for atob since it's deprecated in node.
- * Does not do any input validation.
- *
- * @see https://github.com/jsdom/abab/blob/master/lib/atob.js
- *
- * @param {string} data
- * @returns {string}
- */
-function asciiToBinary(data) {
-  if (data.length % 4 === 0) {
-    data = data.replace(/==?$/, "");
-  }
-
-  let output = "";
-  let buffer = 0;
-  let accumulatedBits = 0;
-
-  for (let i = 0; i < data.length; i++) {
-    buffer <<= 6;
-    buffer |= KEY_STRING.indexOf(data[i]);
-    accumulatedBits += 6;
-    if (accumulatedBits === 24) {
-      output += String.fromCharCode((buffer & 0xff0000) >> 16);
-      output += String.fromCharCode((buffer & 0xff00) >> 8);
-      output += String.fromCharCode(buffer & 0xff);
-      buffer = accumulatedBits = 0;
-    }
-  }
-  if (accumulatedBits === 12) {
-    buffer >>= 4;
-    output += String.fromCharCode(buffer);
-  } else if (accumulatedBits === 18) {
-    buffer >>= 2;
-    output += String.fromCharCode((buffer & 0xff00) >> 8);
-    output += String.fromCharCode(buffer & 0xff);
-  }
-  return output;
-}
-
-/**
- * Substitute for btoa since it's deprecated in node.
- * Does not do any input validation.
- *
- * @see https://github.com/jsdom/abab/blob/master/lib/btoa.js
- *
- * @param {string} str
- * @returns {string}
- */
-function binaryToAscii(str) {
-  let out = "";
-  for (let i = 0; i < str.length; i += 3) {
-    /** @type {[number, number, number, number]} */
-    const groupsOfSix = [undefined, undefined, undefined, undefined];
-    groupsOfSix[0] = str.charCodeAt(i) >> 2;
-    groupsOfSix[1] = (str.charCodeAt(i) & 0x03) << 4;
-    if (str.length > i + 1) {
-      groupsOfSix[1] |= str.charCodeAt(i + 1) >> 4;
-      groupsOfSix[2] = (str.charCodeAt(i + 1) & 0x0f) << 2;
-    }
-    if (str.length > i + 2) {
-      groupsOfSix[2] |= str.charCodeAt(i + 2) >> 6;
-      groupsOfSix[3] = str.charCodeAt(i + 2) & 0x3f;
-    }
-    for (let j = 0; j < groupsOfSix.length; j++) {
-      if (typeof groupsOfSix[j] === "undefined") {
-        out += "=";
-      } else {
-        out += KEY_STRING[groupsOfSix[j]];
-      }
-    }
-  }
-  return out;
-}
-
-const UNDEFINED = -1;
-const HOLE = -2;
-const NAN = -3;
-const POSITIVE_INFINITY = -4;
-const NEGATIVE_INFINITY = -5;
-const NEGATIVE_ZERO = -6;
-const SPARSE = -7;
-
-/**
- * Revive a value serialized with `devalue.stringify`
- * @param {string} serialized
- * @param {Record<string, (value: any) => any>} [revivers]
- */
-function parse(serialized, revivers) {
-	return unflatten(JSON.parse(serialized), revivers);
-}
-
-/**
- * Revive a value flattened with `devalue.stringify`
- * @param {number | any[]} parsed
- * @param {Record<string, (value: any) => any>} [revivers]
- */
-function unflatten(parsed, revivers) {
-	if (typeof parsed === 'number') return hydrate(parsed, true);
-
-	if (!Array.isArray(parsed) || parsed.length === 0) {
-		throw new Error('Invalid input');
-	}
-
-	const values = /** @type {any[]} */ (parsed);
-
-	const hydrated = Array(values.length);
-
-	/**
-	 * A set of values currently being hydrated with custom revivers,
-	 * used to detect invalid cyclical dependencies
-	 * @type {Set<number> | null}
-	 */
-	let hydrating = null;
-
-	/**
-	 * @param {number} index
-	 * @returns {any}
-	 */
-	function hydrate(index, standalone = false) {
-		if (index === UNDEFINED) return undefined;
-		if (index === NAN) return NaN;
-		if (index === POSITIVE_INFINITY) return Infinity;
-		if (index === NEGATIVE_INFINITY) return -Infinity;
-		if (index === NEGATIVE_ZERO) return -0;
-
-		if (standalone || typeof index !== 'number') {
-			throw new Error(`Invalid input`);
-		}
-
-		if (index in hydrated) return hydrated[index];
-
-		const value = values[index];
-
-		if (!value || typeof value !== 'object') {
-			hydrated[index] = value;
-		} else if (Array.isArray(value)) {
-			if (typeof value[0] === 'string') {
-				const type = value[0];
-
-				const reviver =
-					revivers && Object.hasOwn(revivers, type)
-						? revivers[type]
-						: undefined;
-
-				if (reviver) {
-					let i = value[1];
-					if (typeof i !== 'number') {
-						// if it's not a number, it was serialized by a builtin reviver
-						// so we need to munge it into the format expected by a custom reviver
-						i = values.push(value[1]) - 1;
-					}
-
-					hydrating ??= new Set();
-
-					if (hydrating.has(i)) {
-						throw new Error('Invalid circular reference');
-					}
-
-					hydrating.add(i);
-					hydrated[index] = reviver(hydrate(i));
-					hydrating.delete(i);
-
-					return hydrated[index];
-				}
-
-				switch (type) {
-					case 'Date':
-						hydrated[index] = new Date(value[1]);
-						break;
-
-					case 'Set':
-						const set = new Set();
-						hydrated[index] = set;
-						for (let i = 1; i < value.length; i += 1) {
-							set.add(hydrate(value[i]));
-						}
-						break;
-
-					case 'Map':
-						const map = new Map();
-						hydrated[index] = map;
-						for (let i = 1; i < value.length; i += 2) {
-							map.set(hydrate(value[i]), hydrate(value[i + 1]));
-						}
-						break;
-
-					case 'RegExp':
-						hydrated[index] = new RegExp(value[1], value[2]);
-						break;
-
-					case 'Object':
-						const object = Object(value[1]);
-
-						if (Object.hasOwn(object, '__proto__')) {
-							throw new Error('Cannot parse an object with a `__proto__` property');
-						}
-
-						hydrated[index] = object;
-						break;
-
-					case 'BigInt':
-						hydrated[index] = BigInt(value[1]);
-						break;
-
-					case 'null':
-						const obj = Object.create(null);
-						hydrated[index] = obj;
-						for (let i = 1; i < value.length; i += 2) {
-							if (value[i] === '__proto__') {
-								throw new Error('Cannot parse an object with a `__proto__` property');
-							}
-
-							obj[value[i]] = hydrate(value[i + 1]);
-						}
-						break;
-
-					case 'Int8Array':
-					case 'Uint8Array':
-					case 'Uint8ClampedArray':
-					case 'Int16Array':
-					case 'Uint16Array':
-					case 'Int32Array':
-					case 'Uint32Array':
-					case 'Float32Array':
-					case 'Float64Array':
-					case 'BigInt64Array':
-					case 'BigUint64Array': {
-						if (values[value[1]][0] !== 'ArrayBuffer') {
-							// without this, if we receive malformed input we could
-							// end up trying to hydrate in a circle or allocate
-							// huge amounts of memory when we call `new TypedArrayConstructor(buffer)`
-							throw new Error('Invalid data');
-						}
-
-						const TypedArrayConstructor = globalThis[type];
-						const buffer = hydrate(value[1]);
-						const typedArray = new TypedArrayConstructor(buffer);
-
-						hydrated[index] =
-							value[2] !== undefined
-								? typedArray.subarray(value[2], value[3])
-								: typedArray;
-
-						break;
-					}
-
-					case 'ArrayBuffer': {
-						const base64 = value[1];
-						if (typeof base64 !== 'string') {
-							throw new Error('Invalid ArrayBuffer encoding');
-						}
-						const arraybuffer = decode64(base64);
-						hydrated[index] = arraybuffer;
-						break;
-					}
-
-					case 'Temporal.Duration':
-					case 'Temporal.Instant':
-					case 'Temporal.PlainDate':
-					case 'Temporal.PlainTime':
-					case 'Temporal.PlainDateTime':
-					case 'Temporal.PlainMonthDay':
-					case 'Temporal.PlainYearMonth':
-					case 'Temporal.ZonedDateTime': {
-						const temporalName = type.slice(9);
-						// @ts-expect-error TS doesn't know about Temporal yet
-						hydrated[index] = Temporal[temporalName].from(value[1]);
-						break;
-					}
-
-					case 'URL': {
-						const url = new URL(value[1]);
-						hydrated[index] = url;
-						break;
-					}
-
-					case 'URLSearchParams': {
-						const url = new URLSearchParams(value[1]);
-						hydrated[index] = url;
-						break;
-					}
-
-					default:
-						throw new Error(`Unknown type ${type}`);
-				}
-			} else if (value[0] === SPARSE) {
-				// Sparse array encoding: [SPARSE, length, idx, val, idx, val, ...]
-				const len = value[1];
-
-				if (!Number.isInteger(len) || len < 0) {
-					throw new Error('Invalid input');
-				}
-
-				const array = new Array(len);
-				hydrated[index] = array;
-
-				for (let i = 2; i < value.length; i += 2) {
-					const idx = value[i];
-
-					if (!Number.isInteger(idx) || idx < 0 || idx >= len) {
-						throw new Error('Invalid input');
-					}
-
-					array[idx] = hydrate(value[i + 1]);
-				}
-			} else {
-				const array = new Array(value.length);
-				hydrated[index] = array;
-
-				for (let i = 0; i < value.length; i += 1) {
-					const n = value[i];
-					if (n === HOLE) continue;
-
-					array[i] = hydrate(n);
-				}
-			}
-		} else {
-			/** @type {Record<string, any>} */
-			const object = {};
-			hydrated[index] = object;
-
-			for (const key of Object.keys(value)) {
-				if (key === '__proto__') {
-					throw new Error('Cannot parse an object with a `__proto__` property');
-				}
-
-				const n = value[key];
-				object[key] = hydrate(n);
-			}
-		}
-
-		return hydrated[index];
-	}
-
-	return hydrate(0);
-}
-
-/**
- * Turn a value into a JSON string that can be parsed with `devalue.parse`
- * @param {any} value
- * @param {Record<string, (value: any) => any>} [reducers]
- */
-function stringify$1(value, reducers) {
-	/** @type {any[]} */
-	const stringified = [];
-
-	/** @type {Map<any, number>} */
-	const indexes = new Map();
-
-	/** @type {Array<{ key: string, fn: (value: any) => any }>} */
-	const custom = [];
-	if (reducers) {
-		for (const key of Object.getOwnPropertyNames(reducers)) {
-			custom.push({ key, fn: reducers[key] });
-		}
-	}
-
-	/** @type {string[]} */
-	const keys = [];
-
-	let p = 0;
-
-	/** @param {any} thing */
-	function flatten(thing) {
-		if (thing === undefined) return UNDEFINED;
-		if (Number.isNaN(thing)) return NAN;
-		if (thing === Infinity) return POSITIVE_INFINITY;
-		if (thing === -Infinity) return NEGATIVE_INFINITY;
-		if (thing === 0 && 1 / thing < 0) return NEGATIVE_ZERO;
-
-		if (indexes.has(thing)) return indexes.get(thing);
-
-		const index = p++;
-		indexes.set(thing, index);
-
-		for (const { key, fn } of custom) {
-			const value = fn(thing);
-			if (value) {
-				stringified[index] = `["${key}",${flatten(value)}]`;
-				return index;
-			}
-		}
-
-		if (typeof thing === 'function') {
-			throw new DevalueError(`Cannot stringify a function`, keys, thing, value);
-		}
-
-		let str = '';
-
-		if (is_primitive(thing)) {
-			str = stringify_primitive(thing);
-		} else {
-			const type = get_type(thing);
-
-			switch (type) {
-				case 'Number':
-				case 'String':
-				case 'Boolean':
-					str = `["Object",${stringify_primitive(thing)}]`;
-					break;
-
-				case 'BigInt':
-					str = `["BigInt",${thing}]`;
-					break;
-
-				case 'Date':
-					const valid = !isNaN(thing.getDate());
-					str = `["Date","${valid ? thing.toISOString() : ''}"]`;
-					break;
-
-				case 'URL':
-					str = `["URL",${stringify_string(thing.toString())}]`;
-					break;
-
-				case 'URLSearchParams':
-					str = `["URLSearchParams",${stringify_string(thing.toString())}]`;
-					break;
-
-				case 'RegExp':
-					const { source, flags } = thing;
-					str = flags
-						? `["RegExp",${stringify_string(source)},"${flags}"]`
-						: `["RegExp",${stringify_string(source)}]`;
-					break;
-
-				case 'Array': {
-					// For dense arrays (no holes), we iterate normally.
-					// When we encounter the first hole, we call Object.keys
-					// to determine the sparseness, then decide between:
-					//   - HOLE encoding: [-2, val, -2, ...] (default)
-					//   - Sparse encoding: [-7, length, idx, val, ...] (for very sparse arrays)
-					// Only the sparse path avoids iterating every slot, which
-					// is what protects against the DoS of e.g. `arr[1000000] = 1`.
-					let mostly_dense = false;
-
-					str = '[';
-
-					for (let i = 0; i < thing.length; i += 1) {
-						if (i > 0) str += ',';
-
-						if (Object.hasOwn(thing, i)) {
-							keys.push(`[${i}]`);
-							str += flatten(thing[i]);
-							keys.pop();
-						} else if (mostly_dense) {
-							// Use dense encoding. The heuristic guarantees the
-							// array is only mildly sparse, so iterating over every
-							// slot is fine.
-							str += HOLE;
-						} else {
-							// Decide between HOLE encoding and sparse encoding.
-							//
-							// HOLE encoding: each hole is serialized as the HOLE
-							// sentinel (-2). For example, [, "a", ,] becomes
-							// [-2, 0, -2]. Each hole costs 3 chars ("-2" + comma).
-							//
-							// Sparse encoding: lists only populated indices.
-							// For example, [, "a", ,] becomes [-7, 3, 1, 0] — the
-							// -7 sentinel, the array length (3), then index-value
-							// pairs. This avoids paying per-hole, but each element
-							// costs extra chars to write its index.
-							//
-							// The values are the same size either way, so the
-							// choice comes down to structural overhead:
-							//
-							//   HOLE overhead:
-							//     3 chars per hole ("-2" + comma)
-							//     = (L - P) * 3
-							//
-							//   Sparse overhead:
-							//     "-7,"          — 3 chars (sparse sentinel + comma)
-							//     + length + "," — (d + 1) chars (array length + comma)
-							//     + per element: index + "," — (d + 1) chars
-							//     = (4 + d) + P * (d + 1)
-							//
-							// where L is the array length, P is the number of
-							// populated elements, and d is the number of digits
-							// in L (an upper bound on the digits in any index).
-							//
-							// Sparse encoding is cheaper when:
-							//   (4 + d) + P * (d + 1) < (L - P) * 3
-							const populated_keys = valid_array_indices(/** @type {any[]} */ (thing));
-							const population = populated_keys.length;
-							const d = String(thing.length).length;
-
-							const hole_cost = (thing.length - population) * 3;
-							const sparse_cost = 4 + d + population * (d + 1);
-
-							if (hole_cost > sparse_cost) {
-								str = '[' + SPARSE + ',' + thing.length;
-								for (let j = 0; j < populated_keys.length; j++) {
-									const key = populated_keys[j];
-									keys.push(`[${key}]`);
-									str += ',' + key + ',' + flatten(thing[key]);
-									keys.pop();
-								}
-								break;
-							} else {
-								mostly_dense = true;
-								str += HOLE;
-							}
-						}
-					}
-
-					str += ']';
-
-					break;
-				}
-
-				case 'Set':
-					str = '["Set"';
-
-					for (const value of thing) {
-						str += `,${flatten(value)}`;
-					}
-
-					str += ']';
-					break;
-
-				case 'Map':
-					str = '["Map"';
-
-					for (const [key, value] of thing) {
-						keys.push(
-							`.get(${is_primitive(key) ? stringify_primitive(key) : '...'})`
-						);
-						str += `,${flatten(key)},${flatten(value)}`;
-						keys.pop();
-					}
-
-					str += ']';
-					break;
-
-				case 'Int8Array':
-				case 'Uint8Array':
-				case 'Uint8ClampedArray':
-				case 'Int16Array':
-				case 'Uint16Array':
-				case 'Int32Array':
-				case 'Uint32Array':
-				case 'Float32Array':
-				case 'Float64Array':
-				case 'BigInt64Array':
-				case 'BigUint64Array': {
-					/** @type {import("./types.js").TypedArray} */
-					const typedArray = thing;
-					str = '["' + type + '",' + flatten(typedArray.buffer);
-
-					const a = thing.byteOffset;
-					const b = a + thing.byteLength;
-
-					// handle subarrays
-					if (a > 0 || b !== typedArray.buffer.byteLength) {
-						const m = +/(\d+)/.exec(type)[1] / 8;
-						str += `,${a / m},${b / m}`;
-					}
-
-					str += ']';
-					break;
-				}
-
-				case 'ArrayBuffer': {
-					/** @type {ArrayBuffer} */
-					const arraybuffer = thing;
-					const base64 = encode64(arraybuffer);
-
-					str = `["ArrayBuffer","${base64}"]`;
-					break;
-				}
-
-				case 'Temporal.Duration':
-				case 'Temporal.Instant':
-				case 'Temporal.PlainDate':
-				case 'Temporal.PlainTime':
-				case 'Temporal.PlainDateTime':
-				case 'Temporal.PlainMonthDay':
-				case 'Temporal.PlainYearMonth':
-				case 'Temporal.ZonedDateTime':
-					str = `["${type}",${stringify_string(thing.toString())}]`;
-					break;
-
-				default:
-					if (!is_plain_object(thing)) {
-						throw new DevalueError(
-							`Cannot stringify arbitrary non-POJOs`,
-							keys,
-							thing,
-							value
-						);
-					}
-
-					if (enumerable_symbols(thing).length > 0) {
-						throw new DevalueError(
-							`Cannot stringify POJOs with symbolic keys`,
-							keys,
-							thing,
-							value
-						);
-					}
-
-					if (Object.getPrototypeOf(thing) === null) {
-						str = '["null"';
-						for (const key of Object.keys(thing)) {
-							if (key === '__proto__') {
-								throw new DevalueError(
-									`Cannot stringify objects with __proto__ keys`,
-									keys,
-									thing,
-									value
-								);
-							}
-
-							keys.push(stringify_key(key));
-							str += `,${stringify_string(key)},${flatten(thing[key])}`;
-							keys.pop();
-						}
-						str += ']';
-					} else {
-						str = '{';
-						let started = false;
-						for (const key of Object.keys(thing)) {
-							if (key === '__proto__') {
-								throw new DevalueError(
-									`Cannot stringify objects with __proto__ keys`,
-									keys,
-									thing,
-									value
-								);
-							}
-
-							if (started) str += ',';
-							started = true;
-							keys.push(stringify_key(key));
-							str += `${stringify_string(key)}:${flatten(thing[key])}`;
-							keys.pop();
-						}
-						str += '}';
-					}
-			}
-		}
-
-		stringified[index] = str;
-		return index;
-	}
-
-	const index = flatten(value);
-
-	// special case — value is represented as a negative index
-	if (index < 0) return `${index}`;
-
-	return `[${stringified.join(',')}]`;
-}
-
-/**
- * @param {any} thing
- * @returns {string}
- */
-function stringify_primitive(thing) {
-	const type = typeof thing;
-	if (type === 'string') return stringify_string(thing);
-	if (thing instanceof String) return stringify_string(thing.toString());
-	if (thing === void 0) return UNDEFINED.toString();
-	if (thing === 0 && 1 / thing < 0) return NEGATIVE_ZERO.toString();
-	if (type === 'bigint') return `["BigInt","${thing}"]`;
-	return String(thing);
 }
 
 const SVELTE_KIT_ASSETS = "/_svelte_kit_assets";
@@ -1574,7 +868,7 @@ const options = {
 		<div class="error">
 			<span class="status">` + status + '</span>\n			<div class="message">\n				<h1>' + message + "</h1>\n			</div>\n		</div>\n	</body>\n</html>\n"
   },
-  version_hash: "1xhd5kr"
+  version_hash: "5y6ue6"
 };
 async function get_hooks() {
   let handle;
@@ -2334,7 +1628,7 @@ async function handle_action_json_request(event, event_state, options2, server) 
   check_named_default_separate(actions);
   try {
     const data = await call_action(event, event_state, actions);
-    if (BROWSER) ;
+    if (browser) ;
     if (data instanceof ActionFailure) {
       return action_json({
         type: "failure",
@@ -2419,7 +1713,7 @@ async function handle_action_request(event, event_state, server) {
   check_named_default_separate(actions);
   try {
     const data = await call_action(event, event_state, actions);
-    if (BROWSER) ;
+    if (browser) ;
     if (data instanceof ActionFailure) {
       return {
         type: "failure",
@@ -3727,7 +3021,7 @@ async function render_response({
       ) : void 0
     };
     try {
-      if (BROWSER) ;
+      if (browser) ;
       event_state.allows_commands = false;
       rendered = await with_request_store({ event, state: event_state }, async () => {
         if (relative) override({ base: base$1, assets: assets$1 });
@@ -4622,7 +3916,7 @@ async function render_page(event, event_state, page, options2, manifest, state, 
     const ssr = nodes.ssr();
     const csr = nodes.csr();
     if (ssr === false && !(state.prerendering && should_prerender_data)) {
-      if (BROWSER && action_result && !event.request.headers.has("x-sveltekit-action")) ;
+      if (browser && action_result && !event.request.headers.has("x-sveltekit-action")) ;
       return await render_response({
         branch: [],
         fetched,
@@ -5504,12 +4798,12 @@ async function internal_respond(request, options2, manifest, state) {
       if (url.pathname === base || url.pathname === base + "/") {
         trailing_slash = "always";
       } else if (page_nodes) {
-        if (BROWSER) ;
+        if (browser) ;
         trailing_slash = page_nodes.trailing_slash();
       } else if (route.endpoint) {
         const node = await route.endpoint();
         trailing_slash = node.trailingSlash ?? "never";
-        if (BROWSER) ;
+        if (browser) ;
       }
       if (!is_data_request) {
         const normalized = normalize_path(url.pathname, trailing_slash);
@@ -5770,7 +5064,7 @@ async function internal_respond(request, options2, manifest, state) {
         });
       }
       if (state.depth === 0) {
-        if (BROWSER && event2.url.pathname === "/.well-known/appspecific/com.chrome.devtools.json") ;
+        if (browser && event2.url.pathname === "/.well-known/appspecific/com.chrome.devtools.json") ;
         return await respond_with_error({
           event: event2,
           event_state,
@@ -5819,8 +5113,6 @@ function filter_env(env, allowed, disallowed) {
       ([k]) => k.startsWith(allowed) && (disallowed === "" || !k.startsWith(disallowed))
     )
   );
-}
-function set_app(value) {
 }
 let init_promise;
 let current = null;

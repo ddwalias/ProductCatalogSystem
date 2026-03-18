@@ -1,48 +1,60 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { page as storesPage } from '$app/stores';
-  import {
-    getProducts,
-    getProduct,
-    getCategories,
-    createProduct,
-    updateProduct,
-    deleteProduct
-  } from '../../lib/api';
-  import type {
-    CategoryTreeItem,
-    ProductListItem,
-    ProductDetail,
-    PagedResult
-  } from '../../lib/types';
-  import { Plus, Search, Filter, RefreshCw, Trash2, Edit, PackageSearch } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  import { getProducts, getCategories, createProduct, updateProduct, deleteProduct } from '../../lib/api';
+  import type { CategoryTreeItem, ProductDetail } from '../../lib/types';
+  import { Plus, Search, RefreshCw, Trash2, Edit, PackageSearch, FilterX } from 'lucide-svelte';
 
-  const defaultProducts: PagedResult<ProductListItem> = { items: [], pageSize: 12, totalCount: 0, cursor: null, nextCursor: null };
-  let products = $state(defaultProducts);
-  let categories = $state<CategoryTreeItem[]>([]);
-  let activeCategoryOptions = $derived(
-    categories.flatMap(c => {
-      const flatten = (t: CategoryTreeItem[]): CategoryTreeItem[] => t.flatMap(i => [i, ...flatten(i.children)]);
-      return [c, ...flatten(c.children)];
-    }).filter(c => c.status === 'Active')
-  );
+  // Shadcn Components
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Label } from "$lib/components/ui/label/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
+  import { Badge } from "$lib/components/ui/badge/index.js";
+  import * as Table from "$lib/components/ui/table/index.js";
+  import * as Card from "$lib/components/ui/card/index.js";
+  import * as Dialog from "$lib/components/ui/dialog/index.js";
+  import * as Select from "$lib/components/ui/select/index.js";
+
+  const queryClient = useQueryClient();
+
+  const categoriesQuery = createQuery(() => ({
+    queryKey: ['categories'],
+    queryFn: getCategories
+  }));
+
+  let activeCategoryOptions = $derived.by(() => {
+    const cats = categoriesQuery.data || [];
+    const flatten = (t: CategoryTreeItem[]): CategoryTreeItem[] => t.flatMap(i => [i, ...flatten(i.children)]);
+    return flatten(cats).filter((c: CategoryTreeItem) => c.status === 'Active');
+  });
 
   let searchInput = $state('');
   let appliedSearch = $state('');
   let categoryFilter = $state('');
-  let priceFromFilter = $state('');
-  let priceToFilter = $state('');
   let sortBy = $state('updatedAt');
   let sortDir = $state('desc');
-  let pageSize = $state(12);
+  let pageSize = $state(10);
   let cursor = $state<string | null>(null);
   let cursorHistory = $state<(string | null)[]>([]);
 
-  let productsBusy = $state(false);
-  let productsError = $state('');
+  const productsQuery = createQuery(() => ({
+    queryKey: ['products', { search: appliedSearch, cursor, pageSize, categoryFilter, sortBy, sortDir }],
+    queryFn: () => getProducts({
+      query: appliedSearch || undefined,
+      cursor,
+      pageSize,
+      categoryId: categoryFilter ? Number(categoryFilter) : null,
+      sortBy,
+      sortDir,
+    }),
+    placeholderData: (prev) => prev
+  }));
 
-  let selectedProduct = $state<ProductDetail | null>(null);
+  let sheetOpen = $state(false);
   let isEditing = $state(false);
+  
   let productForm = $state({
     id: null as number | null,
     rowVersion: '',
@@ -55,68 +67,54 @@
     inventoryReason: '',
     changedBy: 'catalog-admin',
   });
-  let productSaveBusy = $state(false);
 
-  onMount(async () => {
-    // Check if query params were passed from dashboard search
+  const createProdMutation = createMutation(() => ({
+    mutationFn: createProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      sheetOpen = false;
+    }
+  }));
+
+  const updateProdMutation = createMutation(() => ({
+    mutationFn: ({ id, payload }: { id: number, payload: any }) => updateProduct(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      sheetOpen = false;
+    }
+  }));
+
+  const deleteProdMutation = createMutation(() => ({
+    mutationFn: deleteProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      sheetOpen = false;
+    }
+  }));
+
+  onMount(() => {
     const qs = $storesPage.url.searchParams;
     const initialSearch = qs.get('search');
-    const initialId = qs.get('id');
     
     if (initialSearch) {
       searchInput = initialSearch;
       appliedSearch = initialSearch;
     }
-
-    try {
-      categories = await getCategories();
-    } catch {}
-
-    await refreshProducts();
-
-    if (initialId) {
-      void loadProduct(Number(initialId));
-    }
   });
-
-  async function refreshProducts() {
-    productsBusy = true;
-    productsError = '';
-    try {
-      products = await getProducts({
-        query: appliedSearch || undefined,
-        cursor,
-        pageSize,
-        categoryId: categoryFilter ? Number(categoryFilter) : null,
-        priceFrom: priceFromFilter ? Number(priceFromFilter) : null,
-        priceTo: priceToFilter ? Number(priceToFilter) : null,
-        sortBy,
-        sortDir,
-      });
-    } catch (error) {
-      productsError = error instanceof Error ? error.message : 'Failed to fetch products';
-    } finally {
-      productsBusy = false;
-    }
-  }
 
   function applySearchFilter() {
     resetCursor();
     appliedSearch = searchInput.trim();
-    void refreshProducts();
   }
 
   function resetCatalogFilters() {
     searchInput = '';
     appliedSearch = '';
     categoryFilter = '';
-    priceFromFilter = '';
-    priceToFilter = '';
     sortBy = 'updatedAt';
     sortDir = 'desc';
-    pageSize = 12;
+    pageSize = 10;
     resetCursor();
-    void refreshProducts();
   }
 
   function resetCursor() {
@@ -125,39 +123,21 @@
   }
 
   function goToNextPage() {
-    if (!products.nextCursor) {
-      return;
-    }
-
+    if (!productsQuery.data?.nextCursor) return;
     cursorHistory = [...cursorHistory, cursor];
-    cursor = products.nextCursor;
-    void refreshProducts();
+    cursor = productsQuery.data.nextCursor;
   }
 
   function goToPreviousPage() {
-    if (cursorHistory.length === 0) {
-      return;
-    }
-
+    if (cursorHistory.length === 0) return;
     const nextHistory = [...cursorHistory];
     const previousCursor = nextHistory.pop() ?? null;
     cursorHistory = nextHistory;
     cursor = previousCursor;
-    void refreshProducts();
-  }
-
-  async function loadProduct(id: number) {
-    try {
-      selectedProduct = await getProduct(id);
-      isEditing = false;
-    } catch (e) {
-      console.error(e);
-    }
   }
 
   function beginDrafting() {
-    selectedProduct = null;
-    isEditing = true;
+    isEditing = false;
     productForm = {
       id: null,
       rowVersion: '',
@@ -170,10 +150,10 @@
       inventoryReason: '',
       changedBy: 'catalog-admin',
     };
+    sheetOpen = true;
   }
 
-  function editProduct(product: ProductDetail) {
-    selectedProduct = product;
+  function editProduct(product: any) {
     isEditing = true;
     productForm = {
       id: product.id,
@@ -187,52 +167,34 @@
       inventoryReason: '',
       changedBy: 'catalog-admin',
     };
+    sheetOpen = true;
   }
 
-  async function submitProductForm(e: Event) {
+  function submitProductForm(e: Event) {
     e.preventDefault();
-    productSaveBusy = true;
-    try {
-      const payload = {
-        name: productForm.name.trim(),
-        description: productForm.description.trim() || null,
-        price: Number(productForm.price),
-        inventoryOnHand: Number(productForm.inventoryOnHand),
-        categoryId: Number(productForm.categoryId),
-        primaryImageUrl: productForm.primaryImageUrl.trim() || null,
-        customAttributes: null,
-        inventoryReason: productForm.inventoryReason.trim() || null,
-        changedBy: productForm.changedBy.trim() || null,
-      };
+    const payload = {
+      name: productForm.name.trim(),
+      description: productForm.description.trim() || null,
+      price: Number(productForm.price),
+      inventoryOnHand: Number(productForm.inventoryOnHand),
+      categoryId: Number(productForm.categoryId),
+      primaryImageUrl: productForm.primaryImageUrl.trim() || null,
+      customAttributes: null,
+      inventoryReason: productForm.inventoryReason.trim() || null,
+      changedBy: productForm.changedBy.trim() || null,
+    };
 
-      let saved;
-      if (productForm.id) {
-        saved = await updateProduct(productForm.id, { ...payload, rowVersion: productForm.rowVersion });
-      } else {
-        saved = await createProduct(payload);
-      }
-      
-      selectedProduct = saved;
-      isEditing = false;
-      await refreshProducts();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error saving product');
-    } finally {
-      productSaveBusy = false;
+    if (productForm.id) {
+      updateProdMutation.mutate({ id: productForm.id, payload: { ...payload, rowVersion: productForm.rowVersion } });
+    } else {
+      createProdMutation.mutate(payload);
     }
   }
 
-  async function deleteSelected() {
+  function deleteSelected() {
     if (!productForm.id) return;
-    if (!confirm(`Delete ${productForm.name}?`)) return;
-    try {
-      await deleteProduct(productForm.id);
-      selectedProduct = null;
-      isEditing = false;
-      await refreshProducts();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Error deleting product');
-    }
+    if (!confirm(`Are you sure you want to delete ${productForm.name}?`)) return;
+    deleteProdMutation.mutate(productForm.id);
   }
 
   function formatMoney(value: number) {
@@ -244,232 +206,242 @@
   <title>Products - Catalog Studio</title>
 </svelte:head>
 
-<div class="h-full flex flex-col xl:flex-row gap-6 animate-in fade-in duration-500">
-  <!-- Left Column: Catalog Stream -->
-  <div class="flex-1 flex flex-col gap-6 min-w-[60%]">
-    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight text-white mb-1">Catalog Stream</h1>
-        <p class="text-slate-400">Discover and curate your entire product collection.</p>
-      </div>
-      <button class="btn-primary flex items-center gap-2" onclick={beginDrafting}>
-        <Plus size={18} /> New Product
-      </button>
-    </header>
-
-    <!-- Filters Panel -->
-    <div class="glass-panel p-6 space-y-4">
-      <div class="flex flex-col sm:flex-row gap-4">
-        <div class="relative flex-1">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            bind:value={searchInput}
-            onkeydown={(e) => { if (e.key === 'Enter') applySearchFilter(); }}
-            placeholder="Search products..."
-            class="input-field pl-10"
-          />
-        </div>
-        <button class="btn-ghost bg-slate-800/50 flex items-center gap-2" onclick={applySearchFilter}>
-          Run Query
-        </button>
-      </div>
-      
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <select bind:value={categoryFilter} class="input-field text-sm" onchange={() => { resetCursor(); void refreshProducts(); }}>
-          <option value="">All Categories</option>
-          {#each activeCategoryOptions as cat}
-            <option value={cat.id}>{cat.name}</option>
-          {/each}
-        </select>
-        <select bind:value={sortBy} class="input-field text-sm" onchange={() => { resetCursor(); void refreshProducts(); }}>
-          <option value="updatedAt">Latest</option>
-          <option value="name">Name</option>
-          <option value="price">Price</option>
-          <option value="inventory">Inventory</option>
-        </select>
-        <select bind:value={sortDir} class="input-field text-sm" onchange={() => { resetCursor(); void refreshProducts(); }}>
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
-        <input bind:value={priceFromFilter} placeholder="Min Price ($)" class="input-field text-sm" onchange={() => { resetCursor(); void refreshProducts(); }} />
-        <input bind:value={priceToFilter} placeholder="Max Price ($)" class="input-field text-sm" onchange={() => { resetCursor(); void refreshProducts(); }} />
-      </div>
-      
-      <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-800">
-        <div class="flex items-center gap-2 text-sm text-slate-400">
-          <Filter size={14} /> 
-          {#if appliedSearch}<span>Query: {appliedSearch}</span>{/if}
-          <span>{products.totalCount} results</span>
-        </div>
-        <button onclick={resetCatalogFilters} class="text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
-          Reset Filters
-        </button>
-      </div>
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div>
+      <h2 class="text-3xl font-bold tracking-tight">Products</h2>
+      <p class="text-muted-foreground mt-1">Manage your catalog inventory and supply.</p>
     </div>
-
-    <!-- Product Grid -->
-    <div class="flex-1 relative min-h-[400px]">
-      {#if productsBusy}
-        <div class="absolute inset-0 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm z-10 rounded-xl">
-          <RefreshCw class="animate-spin text-indigo-500" size={32} />
-        </div>
-      {/if}
-      
-      {#if productsError}
-        <div class="p-4 bg-rose-500/10 text-rose-400 rounded-lg border border-rose-500/20">{productsError}</div>
-      {:else if products.items.length === 0 && !productsBusy}
-        <div class="h-full flex flex-col items-center justify-center text-slate-500 p-12 border border-dashed border-slate-800 rounded-2xl">
-          <Search size={48} class="mb-4 opacity-50" />
-          <h3 class="text-xl font-semibold text-slate-300">No products found</h3>
-          <p class="mt-2 text-center max-w-sm">Try adjusting your filters or expanding your search criteria.</p>
-        </div>
-      {:else}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {#each products.items as product}
-            <button 
-              class="glass-card text-left flex flex-col h-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500 {selectedProduct?.id === product.id ? 'ring-2 ring-indigo-500 bg-slate-800/80' : ''}"
-              onclick={() => loadProduct(product.id)}
-            >
-              <div class="h-40 w-full bg-slate-900 flex items-center justify-center overflow-hidden border-b border-slate-800/50 relative">
-                {#if product.primaryImageUrl}
-                  <img src={product.primaryImageUrl} alt={product.name} class="w-full h-full object-cover transition-transform duration-500 hover:scale-110" loading="lazy" />
-                {:else}
-                  <span class="text-4xl font-bold text-slate-700">{product.name.charAt(0)}</span>
-                {/if}
-                <div class="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-md px-2 py-1 rounded text-xs font-medium text-slate-300">
-                  v{product.versionNumber}
-                </div>
-              </div>
-              <div class="p-4 flex-1 flex flex-col">
-                <div class="text-xs font-semibold text-indigo-400 mb-1">{product.categoryName}</div>
-                <h3 class="text-lg font-bold text-white mb-2 leading-tight line-clamp-1">{product.name}</h3>
-                <div class="mt-auto flex justify-between items-end pt-4">
-                  <span class="text-lg font-bold text-cyan-400">{formatMoney(product.price)}</span>
-                  <div class="flex items-center gap-1.5 text-xs text-slate-400">
-                    <span class="w-2 h-2 rounded-full {product.inventoryOnHand > 10 ? 'bg-emerald-500' : product.inventoryOnHand > 0 ? 'bg-amber-500' : 'bg-rose-500'}"></span>
-                    {product.inventoryOnHand} in stock
-                  </div>
-                </div>
-              </div>
-            </button>
-          {/each}
-        </div>
-        
-        <!-- Pagination -->
-        <div class="mt-6 flex justify-between items-center glass-panel p-2 px-4 rounded-full">
-          <button class="btn-ghost py-1.5 px-3 text-sm" disabled={cursorHistory.length === 0} onclick={goToPreviousPage}>Prev</button>
-          <span class="text-sm font-medium text-slate-400">Showing <span class="text-slate-200">{products.items.length}</span> of {products.totalCount}</span>
-          <button class="btn-ghost py-1.5 px-3 text-sm" disabled={!products.nextCursor} onclick={goToNextPage}>Next</button>
-        </div>
-      {/if}
-    </div>
+    <Button onclick={beginDrafting}>
+      <Plus class="mr-2 h-4 w-4" /> Add Product
+    </Button>
   </div>
 
-  <!-- Right Column: Spotlight / Editor -->
-  <div class="w-full xl:w-96 shrink-0 flex flex-col gap-6">
-    {#if isEditing}
-      <!-- Editor Panel -->
-      <div class="glass-panel p-6 sticky top-8">
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-xl font-bold text-white">{productForm.id ? 'Edit Product' : 'New Product'}</h2>
-          {#if productForm.id}
-            <button onclick={deleteSelected} class="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors">
-              <Trash2 size={18} />
-            </button>
-          {/if}
-        </div>
-        
-        <form onsubmit={submitProductForm} class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-400 mb-1">Name</label>
-            <input bind:value={productForm.name} required class="input-field" placeholder="Aurora Lamp" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-400 mb-1">Category</label>
-            <select bind:value={productForm.categoryId} required class="input-field">
-              {#each activeCategoryOptions as cat}
-                <option value={cat.id}>{cat.name}</option>
-              {/each}
-            </select>
-          </div>
-          <div class="flex gap-4">
-            <div class="flex-1">
-              <label class="block text-xs font-medium text-slate-400 mb-1">Price ($)</label>
-              <input type="number" step="0.01" bind:value={productForm.price} required class="input-field" />
-            </div>
-            <div class="flex-1">
-              <label class="block text-xs font-medium text-slate-400 mb-1">Stock</label>
-              <input type="number" bind:value={productForm.inventoryOnHand} required class="input-field" />
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-400 mb-1">Description</label>
-            <textarea bind:value={productForm.description} rows="3" class="input-field" placeholder="Product details..."></textarea>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-400 mb-1">Image URL</label>
-            <input bind:value={productForm.primaryImageUrl} class="input-field" placeholder="https://..." />
-          </div>
-          
-          <div class="pt-4 border-t border-slate-800 flex gap-3">
-            <button type="button" class="btn-ghost flex-1" onclick={() => isEditing = false}>Cancel</button>
-            <button type="submit" disabled={productSaveBusy} class="btn-primary flex-1">
-              {productSaveBusy ? 'Saving...' : 'Save'}
-            </button>
-          </div>
-        </form>
+  <Card.Root>
+    <!-- Filter Bar -->
+    <div class="p-4 border-b flex flex-col md:flex-row gap-4 items-center bg-muted/20">
+      <div class="relative w-full flex-1 max-w-sm">
+        <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input 
+          bind:value={searchInput}
+          onkeydown={(e) => { if (e.key === 'Enter') applySearchFilter(); }}
+          placeholder="Search products..."
+          class="pl-9 h-9 w-full bg-background"
+        />
       </div>
-    {:else if selectedProduct}
-      <!-- Spotlight Panel -->
-      <div class="glass-panel overflow-hidden sticky top-8">
-        <div class="h-64 bg-slate-900 relative">
-          {#if selectedProduct.primaryImageUrl}
-            <img src={selectedProduct.primaryImageUrl} alt={selectedProduct.name} class="w-full h-full object-cover" />
+      
+      <div class="flex flex-wrap gap-3 w-full md:w-auto">
+        <Select.Root 
+          type="single"
+          bind:value={categoryFilter}
+          onValueChange={() => resetCursor()}
+        >
+          <Select.Trigger class="w-[180px] bg-background">
+            {categoryFilter ? (activeCategoryOptions.find(c => String(c.id) === categoryFilter)?.name ?? 'All Categories') : 'All Categories'}
+          </Select.Trigger>
+          <Select.Content>
+            <Select.Item value="">All Categories</Select.Item>
+            {#each activeCategoryOptions as cat}
+              <Select.Item value={String(cat.id)}>{cat.name}</Select.Item>
+            {/each}
+          </Select.Content>
+        </Select.Root>
+
+        <Select.Root 
+          type="single"
+          bind:value={sortBy}
+          onValueChange={() => resetCursor()}
+        >
+          <Select.Trigger class="w-[120px] bg-background">
+            {sortBy === 'updatedAt' ? 'Latest' : sortBy === 'name' ? 'Name' : sortBy === 'price' ? 'Price' : 'Inventory'}
+          </Select.Trigger>
+          <Select.Content>
+            <Select.Item value="updatedAt">Latest</Select.Item>
+            <Select.Item value="name">Name</Select.Item>
+            <Select.Item value="price">Price</Select.Item>
+            <Select.Item value="inventory">Inventory</Select.Item>
+          </Select.Content>
+        </Select.Root>
+
+        <Select.Root 
+          type="single"
+          bind:value={sortDir}
+          onValueChange={() => resetCursor()}
+        >
+          <Select.Trigger class="w-[100px] bg-background">
+            {sortDir === 'desc' ? 'Desc' : 'Asc'}
+          </Select.Trigger>
+          <Select.Content>
+            <Select.Item value="desc">Desc</Select.Item>
+            <Select.Item value="asc">Asc</Select.Item>
+          </Select.Content>
+        </Select.Root>
+        
+        {#if appliedSearch || categoryFilter || sortBy !== 'updatedAt'}
+          <Button variant="ghost" size="sm" onclick={resetCatalogFilters} class="h-9 px-2 text-muted-foreground hover:text-foreground">
+            <FilterX class="h-4 w-4 mr-1" /> Clear
+          </Button>
+        {/if}
+      </div>
+    </div>
+
+    <div class="w-full overflow-auto">
+      <Table.Root>
+        <Table.Header>
+          <Table.Row>
+            <Table.Head class="w-[60px]"></Table.Head>
+            <Table.Head>Product</Table.Head>
+            <Table.Head>Status</Table.Head>
+            <Table.Head class="text-right">Price</Table.Head>
+            <Table.Head class="text-right">Stock</Table.Head>
+            <Table.Head class="w-[60px]"></Table.Head>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {#if productsQuery.isFetching && !productsQuery.isPlaceholderData}
+            <Table.Row>
+              <Table.Cell colspan={6} class="h-32 text-center">
+                <RefreshCw class="animate-spin text-muted-foreground mx-auto h-6 w-6" />
+              </Table.Cell>
+            </Table.Row>
+          {:else if productsQuery.isError}
+            <Table.Row>
+              <Table.Cell colspan={6} class="h-32 text-center text-destructive">
+                Failed to load products. {String(productsQuery.error)}
+              </Table.Cell>
+            </Table.Row>
+          {:else if productsQuery.data?.items.length === 0}
+            <Table.Row>
+              <Table.Cell colspan={6} class="h-48 text-center text-muted-foreground">
+                <PackageSearch class="mx-auto h-8 w-8 mb-3 text-muted-foreground/50" />
+                No products found. Allow filters to be less restrictive.
+              </Table.Cell>
+            </Table.Row>
           {:else}
-            <div class="w-full h-full flex items-center justify-center text-7xl font-bold text-slate-800 bg-slate-900 border-b border-slate-800/50">
-              {selectedProduct.name.charAt(0)}
-            </div>
+            {#each productsQuery.data?.items || [] as product}
+              <Table.Row class="hover:bg-muted/50 transition-colors">
+                <Table.Cell>
+                  <div class="h-10 w-10 flex items-center justify-center rounded-md border bg-muted overflow-hidden">
+                    {#if product.primaryImageUrl}
+                      <img src={product.primaryImageUrl} alt={product.name} class="h-full w-full object-cover" />
+                    {:else}
+                      <span class="text-muted-foreground font-semibold uppercase text-xs">{product.name.charAt(0)}</span>
+                    {/if}
+                  </div>
+                </Table.Cell>
+                <Table.Cell>
+                  <div class="font-medium text-foreground">{product.name}</div>
+                  <div class="text-xs text-muted-foreground mt-0.5">{product.categoryName}</div>
+                </Table.Cell>
+                <Table.Cell>
+                  <Badge variant="outline" class="font-normal text-xs">
+                    v{product.versionNumber}
+                  </Badge>
+                </Table.Cell>
+                <Table.Cell class="text-right font-medium">
+                  {formatMoney(product.price)}
+                </Table.Cell>
+                <Table.Cell class="text-right">
+                  <span class={product.inventoryOnHand > 10 ? 'text-foreground' : product.inventoryOnHand > 0 ? 'text-orange-500 font-medium' : 'text-destructive font-medium'}>
+                    {product.inventoryOnHand}
+                  </span>
+                </Table.Cell>
+                <Table.Cell>
+                  <Button variant="ghost" size="icon" onclick={() => editProduct(product)}>
+                    <Edit class="h-4 w-4 text-muted-foreground" />
+                    <span class="sr-only">Edit</span>
+                  </Button>
+                </Table.Cell>
+              </Table.Row>
+            {/each}
           {/if}
-          <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
-          
-          <button onclick={() => editProduct(selectedProduct!)} class="absolute top-4 right-4 p-2 bg-slate-900/50 hover:bg-indigo-500 text-white backdrop-blur-md rounded-full shadow-lg transition-all">
-            <Edit size={18} />
-          </button>
+        </Table.Body>
+      </Table.Root>
+    </div>
+    
+    <div class="p-4 border-t flex flex-col md:flex-row items-center justify-between gap-4 text-sm bg-muted/10">
+      <div class="text-muted-foreground">
+        Showing <span class="font-medium text-foreground">{productsQuery.data?.items.length ?? 0}</span> of {productsQuery.data?.totalCount ?? 0} total.
+      </div>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" size="sm" class="h-8" disabled={cursorHistory.length === 0} onclick={goToPreviousPage}>Previous</Button>
+        <Button variant="outline" size="sm" class="h-8" disabled={!productsQuery.data?.nextCursor} onclick={goToNextPage}>Next</Button>
+      </div>
+    </div>
+  </Card.Root>
+</div>
+
+<!-- Product Editor Dialog -->
+<Dialog.Root bind:open={sheetOpen}>
+  <Dialog.Content class="w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
+    <Dialog.Header>
+      <Dialog.Title>{productForm.id ? 'Edit Product' : 'Create Product'}</Dialog.Title>
+      <Dialog.Description>
+        Fill in the details for this item.
+      </Dialog.Description>
+    </Dialog.Header>
+
+    <form onsubmit={submitProductForm} class="space-y-6 py-6">
+      <div class="space-y-4">
+        <div class="space-y-2">
+          <Label for="name">Name</Label>
+          <Input id="name" bind:value={productForm.name} required placeholder="Product Title" />
         </div>
         
-        <div class="p-6">
-          <div class="inline-block px-3 py-1 mb-3 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider">
-            {selectedProduct.categoryName}
+        <div class="space-y-2">
+          <Label for="category">Category</Label>
+          <Select.Root
+            type="single"
+            bind:value={productForm.categoryId}
+          >
+            <Select.Trigger class="w-full">
+              {productForm.categoryId ? (activeCategoryOptions.find(c => String(c.id) === productForm.categoryId)?.name ?? 'Select Category') : 'Select Category'}
+            </Select.Trigger>
+            <Select.Content>
+              {#each activeCategoryOptions as cat}
+                <Select.Item value={String(cat.id)}>{cat.name}</Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <Label for="price">Price ($)</Label>
+            <Input id="price" type="number" step="0.01" bind:value={productForm.price} required />
           </div>
-          <h2 class="text-2xl font-bold text-white mb-2">{selectedProduct.name}</h2>
-          <p class="text-slate-400 text-sm mb-6 leading-relaxed">
-            {selectedProduct.description || 'No description available for this product.'}
-          </p>
-          
-          <div class="grid grid-cols-2 gap-4 mb-6">
-            <div class="p-4 rounded-xl bg-slate-900/50 border border-slate-800">
-              <div class="text-xs text-slate-500 mb-1 font-medium">Price</div>
-              <div class="text-xl font-bold text-cyan-400">{formatMoney(selectedProduct.price)}</div>
-            </div>
-            <div class="p-4 rounded-xl bg-slate-900/50 border border-slate-800">
-              <div class="text-xs text-slate-500 mb-1 font-medium">Inventory</div>
-              <div class="text-xl font-bold {selectedProduct.inventoryOnHand > 0 ? 'text-emerald-400' : 'text-rose-400'}">{selectedProduct.inventoryOnHand} Units</div>
-            </div>
-          </div>
-          
-          <div class="text-xs text-slate-500 flex justify-between pt-4 border-t border-slate-800">
-            <span>v{selectedProduct.versionNumber}</span>
-            <span>Created {new Date(selectedProduct.createdAtUtc).toLocaleDateString()}</span>
+          <div class="space-y-2">
+            <Label for="stock">Inventory Stock</Label>
+            <Input id="stock" type="number" bind:value={productForm.inventoryOnHand} required />
           </div>
         </div>
+
+        <div class="space-y-2">
+          <Label for="imageUrl">Image URL</Label>
+          <Input id="imageUrl" bind:value={productForm.primaryImageUrl} placeholder="https://..." />
+        </div>
+        
+        <div class="space-y-2">
+          <Label for="description">Description</Label>
+          <Textarea id="description" bind:value={productForm.description} rows={4} placeholder="Detailed product description..." class="resize-none" />
+        </div>
       </div>
-    {:else}
-      <!-- Empty Spotlight State -->
-      <div class="glass-panel p-8 h-64 flex flex-col items-center justify-center text-center text-slate-500 border border-dashed border-slate-800 sticky top-8">
-        <PackageSearch size={48} class="mb-4 opacity-50" />
-        <h3 class="text-lg font-medium text-slate-300">Spotlight</h3>
-        <p class="text-sm mt-2 max-w-[200px]">Select a product from the stream to view its details or edit properties.</p>
-      </div>
-    {/if}
-  </div>
-</div>
+
+      <Dialog.Footer class="flex flex-col-reverse sm:flex-row sm:justify-between items-center w-full gap-2 mt-4">
+        <div class="w-full sm:w-auto">
+          {#if productForm.id}
+            <Button type="button" variant="destructive" class="w-full sm:w-auto" onclick={deleteSelected} disabled={deleteProdMutation.isPending}>
+              <Trash2 class="mr-2 h-4 w-4" /> Delete
+            </Button>
+          {/if}
+        </div>
+        <div class="flex gap-2 w-full sm:w-auto justify-end">
+          <Button type="button" variant="ghost" onclick={() => sheetOpen = false}>Cancel</Button>
+          <Button type="submit" disabled={createProdMutation.isPending || updateProdMutation.isPending}>
+            {createProdMutation.isPending || updateProdMutation.isPending ? 'Saving...' : 'Save Product'}
+          </Button>
+        </div>
+      </Dialog.Footer>
+    </form>
+  </Dialog.Content>
+</Dialog.Root>

@@ -17,10 +17,19 @@ frontend/dist/
 frontend/dist-ssr/
 frontend/build/
 
+# Aspire generated output
+.aspire/
+**/aspire-output/
+
 # Logs and local env files
 *.log
 *.local
+*.env
+*.env.*
 
 # OS files
 .DS_Store
 Thumbs.db
+
+# Rider / ReSharper local files
+*.DotSettings.user

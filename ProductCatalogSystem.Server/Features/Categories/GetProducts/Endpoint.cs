@@ -19,7 +19,11 @@ public sealed class Endpoint(
     public override async Task HandleAsync(ProductListQuery request, CancellationToken cancellationToken)
     {
         var categoryId = Route<long>("id");
-        if (!await categoryReader.ExistsAsync(categoryId, cancellationToken))
+        request.CategoryId = categoryId;
+        var result = await productReader.GetProductsAsync(request, cancellationToken);
+
+        if (result.TotalCount == 0 &&
+            !await categoryReader.ExistsAsync(categoryId, cancellationToken))
         {
             await HttpContext.WriteProblemAsync(
                 StatusCodes.Status404NotFound,
@@ -29,8 +33,6 @@ public sealed class Endpoint(
             return;
         }
 
-        request.CategoryId = categoryId;
-        var result = await productReader.GetProductsAsync(request, cancellationToken);
         await HttpContext.Response.WriteAsJsonAsync(result, cancellationToken);
     }
 }

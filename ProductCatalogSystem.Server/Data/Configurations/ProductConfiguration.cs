@@ -41,6 +41,18 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(product => product.CategoryId);
         builder.HasIndex(product => product.Name);
         builder.HasIndex(product => new { product.CategoryId, product.Name });
+        builder.HasIndex(product => new { product.Price, product.Id })
+            .HasFilter("[DeletedAtUtc] IS NULL");
+        builder.HasIndex(product => new { product.CategoryId, product.Price, product.Id })
+            .HasFilter("[DeletedAtUtc] IS NULL");
+        builder.HasIndex(product => new { product.UpdatedAtUtc, product.Id })
+            .HasFilter("[DeletedAtUtc] IS NULL");
+        builder.HasIndex(product => new { product.CategoryId, product.UpdatedAtUtc, product.Id })
+            .HasFilter("[DeletedAtUtc] IS NULL");
+        builder.HasIndex(product => new { product.InventoryOnHand, product.Id })
+            .HasFilter("[DeletedAtUtc] IS NULL");
+        builder.HasIndex(product => new { product.CategoryId, product.InventoryOnHand, product.Id })
+            .HasFilter("[DeletedAtUtc] IS NULL");
 
         builder.ToTable(table =>
         {

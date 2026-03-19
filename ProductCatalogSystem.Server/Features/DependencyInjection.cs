@@ -8,13 +8,19 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddCatalogFeatures(this IServiceCollection services, bool useElasticsearch, bool useMessageBus)
     {
+        services.AddSingleton<ProductSearchIndexAvailabilityState>();
+
         if (useElasticsearch)
         {
-            services.AddScoped<IProductSearchIndex, ElasticsearchProductSearchIndex>();
+            services.AddHostedService<ProductSearchIndexRecoveryService>();
+            services.AddScoped<ElasticsearchProductSearchIndex>();
+            services.AddScoped<IProductSearchIndex>(provider => provider.GetRequiredService<ElasticsearchProductSearchIndex>());
+            services.AddScoped<IProductSearchIndexRecovery>(provider => provider.GetRequiredService<ElasticsearchProductSearchIndex>());
         }
         else
         {
             services.AddScoped<IProductSearchIndex, NoOpProductSearchIndex>();
+            services.AddScoped<IProductSearchIndexRecovery, NoOpProductSearchIndexRecovery>();
         }
 
         if (useMessageBus)

@@ -77,6 +77,48 @@ public sealed class ApiEndpointTests
     }
 
     [Fact]
+    public async Task GetCategoryProducts_ShouldReturnNotFoundWhenCategoryDoesNotExist()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/categories/999/products");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetCategoryProducts_ShouldReturnOkWhenCategoryExistsWithoutProducts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        await factory.SeedAsync(dbContext =>
+        {
+            dbContext.Categories.Add(new Category
+            {
+                Id = 5,
+                Name = "Empty Category",
+                DisplayOrder = 50,
+                Status = CategoryStatus.Active,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+                RowVersion = [1]
+            });
+
+            return dbContext.SaveChangesAsync();
+        });
+
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/categories/5/products");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var payload = await response.Content.ReadFromJsonAsync<PagedProductsResponse>();
+        payload.Should().NotBeNull();
+        payload!.Items.Should().BeEmpty();
+        payload.TotalCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task UpdateProduct_ShouldAllowPartialNameOnlyPayload()
     {
         await using var factory = new ApiWebApplicationFactory();
@@ -202,6 +244,12 @@ public sealed class ApiEndpointTests
         string? PrimaryImageUrl,
         int VersionNumber,
         long CategoryId);
+
+    private sealed record ProductSummaryResponse(long Id, string Name);
+
+    private sealed record PagedProductsResponse(
+        List<ProductSummaryResponse> Items,
+        int TotalCount);
 
     private sealed class ValidationProblemResponse
     {

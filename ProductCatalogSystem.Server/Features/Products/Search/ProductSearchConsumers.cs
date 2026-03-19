@@ -37,3 +37,45 @@ public sealed class ProductSearchDeleteRequestedConsumer(
         await productSearchIndex.DeleteAsync(context.Message.ProductId, context.CancellationToken);
     }
 }
+
+public sealed class ProductSearchUpsertRequestedConsumerDefinition
+    : ConsumerDefinition<ProductSearchUpsertRequestedConsumer>
+{
+    protected override void ConfigureConsumer(
+        IReceiveEndpointConfigurator endpointConfigurator,
+        IConsumerConfigurator<ProductSearchUpsertRequestedConsumer> consumerConfigurator,
+        IRegistrationContext context)
+    {
+        endpointConfigurator.UseDelayedRedelivery(redelivery =>
+            redelivery.Intervals(
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMinutes(5),
+                TimeSpan.FromMinutes(15)));
+
+        endpointConfigurator.UseKillSwitch(options => options
+            .SetActivationThreshold(2)
+            .SetTripThreshold(0.20)
+            .SetRestartTimeout(m: 1));
+    }
+}
+
+public sealed class ProductSearchDeleteRequestedConsumerDefinition
+    : ConsumerDefinition<ProductSearchDeleteRequestedConsumer>
+{
+    protected override void ConfigureConsumer(
+        IReceiveEndpointConfigurator endpointConfigurator,
+        IConsumerConfigurator<ProductSearchDeleteRequestedConsumer> consumerConfigurator,
+        IRegistrationContext context)
+    {
+        endpointConfigurator.UseDelayedRedelivery(redelivery =>
+            redelivery.Intervals(
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMinutes(5),
+                TimeSpan.FromMinutes(15)));
+
+        endpointConfigurator.UseKillSwitch(options => options
+            .SetActivationThreshold(2)
+            .SetTripThreshold(0.20)
+            .SetRestartTimeout(m: 1));
+    }
+}

@@ -268,6 +268,60 @@ public sealed class ProductServiceTests
     }
 
     [Fact]
+    public async Task GetProductsAsync_ShouldApplyFallbackTextSearchWithoutSqlServerFullText()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.Categories.Add(new Category
+        {
+            Id = 1,
+            Name = "Active",
+            DisplayOrder = 10,
+            Status = CategoryStatus.Active,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            RowVersion = [1]
+        });
+        dbContext.Products.AddRange(
+            new Product
+            {
+                Id = 1,
+                Name = "Wireless Headphones",
+                Description = "Over-ear bluetooth audio",
+                CategoryId = 1,
+                Price = 120m,
+                InventoryOnHand = 5,
+                VersionNumber = 1,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            },
+            new Product
+            {
+                Id = 2,
+                Name = "Pro Wireless Mouse",
+                Description = "Ergonomic mouse for workstations",
+                CategoryId = 1,
+                Price = 80m,
+                InventoryOnHand = 4,
+                VersionNumber = 1,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateProductReader(dbContext);
+
+        var result = await service.GetProductsAsync(
+            new ProductListQuery
+            {
+                Query = "wireless mouse"
+            },
+            CancellationToken.None);
+
+        result.Items.Should().ContainSingle();
+        result.Items[0].Name.Should().Be("Pro Wireless Mouse");
+    }
+
+    [Fact]
     public async Task GetAutocompleteAsync_ShouldReturnPrefixMatchesFirst()
     {
         await using var dbContext = CreateDbContext();

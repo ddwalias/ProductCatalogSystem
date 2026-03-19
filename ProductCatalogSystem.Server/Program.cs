@@ -69,8 +69,8 @@ if (hasMessageTransport)
     });
     builder.Services.AddMassTransit(x =>
     {
-        x.AddConsumer<ProductSearchUpsertRequestedConsumer>();
-        x.AddConsumer<ProductSearchDeleteRequestedConsumer>();
+        x.AddConsumer<ProductSearchUpsertRequestedConsumer, ProductSearchUpsertRequestedConsumerDefinition>();
+        x.AddConsumer<ProductSearchDeleteRequestedConsumer, ProductSearchDeleteRequestedConsumerDefinition>();
 
         x.AddEntityFrameworkOutbox<CatalogDbContext>(o =>
         {

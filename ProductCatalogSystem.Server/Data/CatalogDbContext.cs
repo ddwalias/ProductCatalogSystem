@@ -34,7 +34,7 @@ public sealed class CatalogDbContext : DbContext
 
     internal void ApplyInventoryTransactions()
     {
-        foreach (var entry in GetInventoryTrackedProductEntries())
+        foreach (var entry in GetInventoryTrackedProductEntries().ToArray())
         {
             AddInventoryTransaction(entry);
         }

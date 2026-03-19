@@ -32,6 +32,9 @@ public sealed class ProductReader(
             {
                 return await GetProductsFromSearchIndexAsync(query, paging, cancellationToken);
             }
+            catch (ProductSearchIndexUnavailableException)
+            {
+            }
             catch (Exception exception)
             {
                 logger.LogWarning(
@@ -88,6 +91,7 @@ public sealed class ProductReader(
         CancellationToken cancellationToken)
     {
         var normalizedQuery = query.Query.Trim();
+        var normalizedSearchTerm = normalizedQuery.ToLowerInvariant();
         var normalizedLimit = Math.Clamp(query.Limit, 1, 20);
 
         if (productSearchIndex.IsEnabled)
@@ -115,6 +119,9 @@ public sealed class ProductReader(
                     .Select(productId => productsById[productId])
                     .ToList();
             }
+            catch (ProductSearchIndexUnavailableException)
+            {
+            }
             catch (Exception exception)
             {
                 logger.LogWarning(
@@ -124,27 +131,12 @@ public sealed class ProductReader(
             }
         }
 
-        var products = dbContext.Products.AsNoTracking();
-
-        if (dbContext.Database.IsSqlServer())
-        {
-            var searchCondition = BuildAutocompleteSearchCondition(normalizedQuery);
-            if (!string.IsNullOrEmpty(searchCondition))
-            {
-                products = products.Where(product => EF.Functions.Contains(product.Name, searchCondition));
-            }
-            else
-            {
-                products = ApplyAutocompleteFallback(products, normalizedQuery);
-            }
-        }
-        else
-        {
-            products = ApplyAutocompleteFallback(products, normalizedQuery);
-        }
+        var products = ApplyAutocompleteFallback(
+            dbContext.Products.AsNoTracking(),
+            normalizedSearchTerm);
 
         return await products
-            .OrderBy(product => !product.Name.StartsWith(normalizedQuery))
+            .OrderBy(product => !product.Name.ToLower().StartsWith(normalizedSearchTerm))
             .ThenBy(product => product.Name)
             .ThenBy(product => product.Id)
             .Take(normalizedLimit)
@@ -227,12 +219,18 @@ public sealed class ProductReader(
             return products;
         }
 
-        var normalizedQuery = query.Query.Trim();
+        var terms = query.Query
+            .Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        return products.Where(product =>
-            EF.Functions.FreeText(product.Name, normalizedQuery) ||
-            (product.Description != null &&
-             EF.Functions.FreeText(product.Description, normalizedQuery)));
+        foreach (var term in terms)
+        {
+            var currentTerm = term.ToLowerInvariant();
+            products = products.Where(product =>
+                product.Name.ToLower().Contains(currentTerm) ||
+                (product.Description != null && product.Description.ToLower().Contains(currentTerm)));
+        }
+
+        return products;
     }
 
     private static IQueryable<Product> ApplyFilters(IQueryable<Product> products, ProductListQuery query)
@@ -258,21 +256,8 @@ public sealed class ProductReader(
     private static IQueryable<Product> ApplyAutocompleteFallback(IQueryable<Product> products, string query)
     {
         return products.Where(product =>
-            product.Name.StartsWith(query) ||
-            product.Name.Contains(query));
-    }
-
-    private static string? BuildAutocompleteSearchCondition(string query)
-    {
-        var terms = query
-            .Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(static term => new string(term.Where(char.IsLetterOrDigit).ToArray()))
-            .Where(static term => !string.IsNullOrWhiteSpace(term))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(static term => $"\"{term}*\"")
-            .ToArray();
-
-        return terms.Length == 0 ? null : string.Join(" AND ", terms);
+            product.Name.ToLower().StartsWith(query) ||
+            product.Name.ToLower().Contains(query));
     }
 
     private async Task<PagedResult<ProductListItemDto>> GetProductsFromSearchIndexAsync(

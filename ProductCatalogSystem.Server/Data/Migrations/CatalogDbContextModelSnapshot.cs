@@ -353,9 +353,27 @@ namespace ProductCatalogSystem.Server.Data.Migrations
 
                     b.HasIndex("CategoryId");
 
+                    b.HasIndex("Price", "Id")
+                        .HasFilter("[DeletedAtUtc] IS NULL");
+
                     b.HasIndex("Name");
 
                     b.HasIndex("CategoryId", "Name");
+
+                    b.HasIndex("CategoryId", "Price", "Id")
+                        .HasFilter("[DeletedAtUtc] IS NULL");
+
+                    b.HasIndex("UpdatedAtUtc", "Id")
+                        .HasFilter("[DeletedAtUtc] IS NULL");
+
+                    b.HasIndex("CategoryId", "UpdatedAtUtc", "Id")
+                        .HasFilter("[DeletedAtUtc] IS NULL");
+
+                    b.HasIndex("InventoryOnHand", "Id")
+                        .HasFilter("[DeletedAtUtc] IS NULL");
+
+                    b.HasIndex("CategoryId", "InventoryOnHand", "Id")
+                        .HasFilter("[DeletedAtUtc] IS NULL");
 
                     b.ToTable("Products", null, t =>
                         {

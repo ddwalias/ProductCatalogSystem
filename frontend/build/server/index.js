@@ -1,7 +1,7 @@
-import { b as browser, u as uneval } from './chunks/index2-BJx0jX4X.js';
-import { t as text_encoder, p as parse, s as stringify$1, a as set_app } from './chunks/app-Tgr-00F-.js';
-import { w as with_request_store, t as text_decoder, b as base64_decode, r as root, d as decode_pathname, n as normalize_path, a as disable_search, c as decode_params, v as validate_layout_server_exports, e as validate_layout_exports, f as validate_page_server_exports, g as validate_page_exports, h as text_encoder$1, i as resolve, m as make_trackable, j as get_relative_path, k as base64_encode } from './chunks/root-CfFML5z2.js';
-import { r as readable, w as writable } from './chunks/index-KDwDKJix.js';
+import { b as browser, u as uneval } from './chunks/index2-CHD6l9Gx.js';
+import { t as text_encoder, p as parse, s as stringify$1, a as set_app } from './chunks/app-Ce6s5Fq_.js';
+import { w as with_request_store, t as text_decoder, b as base64_decode, r as root, d as decode_pathname, n as normalize_path, a as disable_search, c as decode_params, v as validate_layout_server_exports, e as validate_layout_exports, f as validate_page_server_exports, g as validate_page_exports, h as text_encoder$1, i as resolve, m as make_trackable, j as get_relative_path, k as base64_encode } from './chunks/root-Cdcf3mOm.js';
+import { r as readable, w as writable } from './chunks/index-BgLwl_Ft.js';
 
 /** @import { StandardSchemaV1 } from '@standard-schema/spec' */
 
@@ -868,7 +868,7 @@ const options = {
 		<div class="error">
 			<span class="status">` + status + '</span>\n			<div class="message">\n				<h1>' + message + "</h1>\n			</div>\n		</div>\n	</body>\n</html>\n"
   },
-  version_hash: "1v9ac41"
+  version_hash: "ghi22f"
 };
 async function get_hooks() {
   let handle;

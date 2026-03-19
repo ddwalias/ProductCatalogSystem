@@ -59,7 +59,7 @@ export interface ProductWritePayload {
   changedBy: string | null;
 }
 
-export interface ProductUpdatePayload extends ProductWritePayload {
+export interface ProductUpdatePayload extends Partial<ProductWritePayload> {
   rowVersion: string;
 }
 

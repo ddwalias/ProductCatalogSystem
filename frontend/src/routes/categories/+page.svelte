@@ -9,6 +9,8 @@
   import CategoryNode from '../../lib/CategoryNode.svelte';
   import type { CategoryTreeItem, CategoryWritePayload, CategoryUpdatePayload } from '../../lib/types';
   import { Folders, Plus, Layers, RefreshCw, BarChart, ChevronRight } from 'lucide-svelte';
+  import { dndzone } from 'svelte-dnd-action';
+  import { flip } from 'svelte/animate';
 
   // Shadcn Components
   import { Button } from "$lib/components/ui/button/index.js";
@@ -40,6 +42,13 @@
   }));
 
   let focusedCategoryId = $state<number | null>(null);
+
+  let rootCategories = $state<CategoryTreeItem[]>([]);
+  $effect(() => {
+    if (categoriesQuery.data) {
+      rootCategories = [...categoriesQuery.data];
+    }
+  });
 
   let focusedCategory = $derived.by(() => {
     return findCategoryById(categoriesQuery.data || [], focusedCategoryId);
@@ -141,6 +150,34 @@
     isError = false;
   }
 
+  function handleRootConsider(e: CustomEvent<any>) {
+    rootCategories = e.detail.items;
+  }
+
+  function handleRootFinalize(e: CustomEvent<any>) {
+    rootCategories = e.detail.items;
+    handleReorder(null, rootCategories);
+  }
+
+  function handleReorder(parentId: number | null, newItems: CategoryTreeItem[]) {
+    newItems.forEach((item, index) => {
+      const newOrder = (index + 1) * 10;
+      if (item.displayOrder !== newOrder || item.parentCategoryId !== parentId) {
+        updateCatMutation.mutate({
+          id: item.id,
+          payload: {
+            name: item.name,
+            description: item.description,
+            parentCategoryId: parentId,
+            status: item.status,
+            displayOrder: newOrder,
+            rowVersion: item.rowVersion
+          }
+        });
+      }
+    });
+  }
+
   function beginCreateCategory(parentCategoryId: number | null = null) {
     formData.set({
       id: null,
@@ -227,14 +264,20 @@
             </div>
           {:else}
             <div class="p-4">
-              <div class="space-y-1 pb-10">
-                {#each categoriesQuery.data || [] as category (category.id)}
-                  <CategoryNode
-                    {category}
-                    currentId={focusedCategoryId}
-                    onCreateChild={beginCreateCategory}
-                    onSelect={focusCategory}
-                  />
+              <div class="space-y-1 pb-10 min-h-[50px]"
+                   use:dndzone={{ items: rootCategories, type: 'category', flipDurationMs: 200, dropTargetStyle: { outline: '2px dashed rgba(var(--primary), 0.4)', borderRadius: '0.375rem' } }}
+                   onconsider={handleRootConsider}
+                   onfinalize={handleRootFinalize}>
+                {#each rootCategories as category (category.id)}
+                  <div animate:flip={{ duration: 200 }}>
+                    <CategoryNode
+                      {category}
+                      currentId={focusedCategoryId}
+                      onCreateChild={beginCreateCategory}
+                      onSelect={focusCategory}
+                      onReorder={handleReorder}
+                    />
+                  </div>
                 {/each}
               </div>
             </div>

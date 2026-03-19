@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -76,6 +77,63 @@ public sealed class ApiEndpointTests
     }
 
     [Fact]
+    public async Task UpdateProduct_ShouldAllowPartialNameOnlyPayload()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var now = DateTime.UtcNow;
+
+        await factory.SeedAsync(async dbContext =>
+        {
+            dbContext.Categories.Add(new Category
+            {
+                Id = 1,
+                Name = "Electronics",
+                DisplayOrder = 1,
+                Status = CategoryStatus.Active,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+                RowVersion = [1]
+            });
+
+            dbContext.Products.Add(new Product
+            {
+                Id = 1,
+                Name = "Original Name",
+                Description = "Original description",
+                Price = 42m,
+                InventoryOnHand = 7,
+                CategoryId = 1,
+                PrimaryImageUrl = "https://example.com/image.png",
+                VersionNumber = 1,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+                RowVersion = [1]
+            });
+
+            await dbContext.SaveChangesAsync();
+        });
+
+        using var client = factory.CreateClient();
+
+        var response = await client.PutAsJsonAsync("/api/products/1", new
+        {
+            name = "Renamed Product",
+            rowVersion = "AQ=="
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var payload = await response.Content.ReadFromJsonAsync<ProductDetailResponse>();
+        payload.Should().NotBeNull();
+        payload!.Name.Should().Be("Renamed Product");
+        payload.Description.Should().Be("Original description");
+        payload.Price.Should().Be(42m);
+        payload.InventoryOnHand.Should().Be(7);
+        payload.CategoryId.Should().Be(1);
+        payload.PrimaryImageUrl.Should().Be("https://example.com/image.png");
+        payload.VersionNumber.Should().Be(2);
+    }
+
+    [Fact]
     public async Task CreateCategory_ShouldRejectOutOfRangeStatus()
     {
         await using var factory = new ApiWebApplicationFactory();
@@ -119,6 +177,7 @@ public sealed class ApiEndpointTests
                 services.AddDbContextPool<CatalogDbContext>(options =>
                 {
                     options.UseInMemoryDatabase(databaseName);
+                    options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
                     options.AddInterceptors(new EntityLifecycleInterceptor());
                 });
             });
@@ -133,6 +192,16 @@ public sealed class ApiEndpointTests
     }
 
     private sealed record CategoryResponse(long Id, string Name);
+
+    private sealed record ProductDetailResponse(
+        long Id,
+        string Name,
+        string? Description,
+        decimal Price,
+        int InventoryOnHand,
+        string? PrimaryImageUrl,
+        int VersionNumber,
+        long CategoryId);
 
     private sealed class ValidationProblemResponse
     {

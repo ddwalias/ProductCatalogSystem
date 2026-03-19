@@ -84,10 +84,13 @@ public sealed class ProductWriter(
         UpdateProductRequest request,
         CancellationToken cancellationToken)
     {
-        var validationErrors = await ValidateProductRequestAsync(request.CategoryId, cancellationToken);
-        if (validationErrors.Count > 0)
+        if (request.HasCategoryId)
         {
-            return new ServiceResult<ProductDetailDto>(ResultStatus.ValidationFailed, Errors: validationErrors);
+            var validationErrors = await ValidateProductRequestAsync(request.CategoryId!.Value, cancellationToken);
+            if (validationErrors.Count > 0)
+            {
+                return new ServiceResult<ProductDetailDto>(ResultStatus.ValidationFailed, Errors: validationErrors);
+            }
         }
 
         var strategy = dbContext.Database.CreateExecutionStrategy();
@@ -109,24 +112,39 @@ public sealed class ProductWriter(
                 return new ServiceResult<ProductDetailDto>(ResultStatus.Conflict, Message: "The product has changed since it was last loaded.");
             }
 
-            product.Name = request.Name.Trim();
-            product.Description = request.Description?.Trim();
-            product.Price = request.Price;
-            product.InventoryOnHand = request.InventoryOnHand;
-            product.CategoryId = request.CategoryId;
-            product.PrimaryImageUrl = request.PrimaryImageUrl?.Trim();
-            product.CustomAttributesJson = JsonObjectSerializer.Serialize(request.CustomAttributes);
-            product.VersionNumber += 1;
+            var updatedName = request.HasName ? request.Name!.Trim() : product.Name;
+            var updatedDescription = request.HasDescription ? request.Description?.Trim() : product.Description;
+            var updatedPrice = request.HasPrice ? request.Price!.Value : product.Price;
+            var updatedInventoryOnHand = request.HasInventoryOnHand ? request.InventoryOnHand!.Value : product.InventoryOnHand;
+            var updatedCategoryId = request.HasCategoryId ? request.CategoryId!.Value : product.CategoryId;
+            var updatedPrimaryImageUrl = request.HasPrimaryImageUrl ? request.PrimaryImageUrl?.Trim() : product.PrimaryImageUrl;
+            var updatedCustomAttributesJson = request.HasCustomAttributes
+                ? JsonObjectSerializer.Serialize(request.CustomAttributes)
+                : product.CustomAttributesJson;
 
-            if (product.InventoryOnHand < 0)
+            var hasChanges =
+                !string.Equals(product.Name, updatedName, StringComparison.Ordinal) ||
+                !string.Equals(product.Description, updatedDescription, StringComparison.Ordinal) ||
+                product.Price != updatedPrice ||
+                product.InventoryOnHand != updatedInventoryOnHand ||
+                product.CategoryId != updatedCategoryId ||
+                !string.Equals(product.PrimaryImageUrl, updatedPrimaryImageUrl, StringComparison.Ordinal) ||
+                !string.Equals(product.CustomAttributesJson, updatedCustomAttributesJson, StringComparison.Ordinal);
+
+            if (!hasChanges)
             {
-                return new ServiceResult<ProductDetailDto>(
-                    ResultStatus.ValidationFailed,
-                    Errors: new Dictionary<string, string[]>
-                    {
-                        [nameof(UpdateProductRequest.InventoryOnHand)] = ["Inventory cannot be negative."]
-                    });
+                var unchangedDto = await productReader.GetByIdAsync(product.Id, null, cancellationToken);
+                return new ServiceResult<ProductDetailDto>(ResultStatus.Success, unchangedDto!);
             }
+
+            product.Name = updatedName;
+            product.Description = updatedDescription;
+            product.Price = updatedPrice;
+            product.InventoryOnHand = updatedInventoryOnHand;
+            product.CategoryId = updatedCategoryId;
+            product.PrimaryImageUrl = updatedPrimaryImageUrl;
+            product.CustomAttributesJson = updatedCustomAttributesJson;
+            product.VersionNumber += 1;
 
             try
             {

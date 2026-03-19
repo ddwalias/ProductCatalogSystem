@@ -118,8 +118,8 @@ export function getProductAutocomplete(params: {
   );
 }
 
-export function getProduct(id: number): Promise<ProductDetail> {
-  return request<ProductDetail>(`/api/products/${id}`);
+export function getProduct(id: number, version?: number): Promise<ProductDetail> {
+  return request<ProductDetail>(`/api/products/${id}${buildQuery({ version })}`);
 }
 
 export function createProduct(payload: ProductWritePayload): Promise<ProductDetail> {

@@ -1,8 +1,10 @@
 <script lang="ts">
   import CategoryNode from './CategoryNode.svelte';
   import type { CategoryTreeItem } from './types';
-  import { GitBranch, ChevronRight, ChevronDown } from 'lucide-svelte';
+  import { GitBranch, ChevronRight, ChevronDown, GripVertical } from 'lucide-svelte';
   import { slide } from 'svelte/transition';
+  import { flip } from 'svelte/animate';
+  import { dndzone } from 'svelte-dnd-action';
 
   interface Props {
     category: CategoryTreeItem;
@@ -10,18 +12,42 @@
     depth?: number;
     onSelect: (category: CategoryTreeItem) => void;
     onCreateChild: (parentCategoryId?: number | null) => void;
+    onReorder?: (parentId: number | null, newItems: CategoryTreeItem[]) => void;
   }
 
-  let { category, currentId, depth = 0, onSelect, onCreateChild }: Props = $props();
+  let { category, currentId, depth = 0, onSelect, onCreateChild, onReorder }: Props = $props();
 
   let isOpen = $state(true);
+
+  let childrenItems = $state<CategoryTreeItem[]>([]);
+  $effect(() => {
+    childrenItems = [...category.children];
+  });
+
+  function handleConsider(e: CustomEvent<any>) {
+    childrenItems = e.detail.items;
+  }
+
+  function handleFinalize(e: CustomEvent<any>) {
+    childrenItems = e.detail.items;
+    if (onReorder) {
+      onReorder(category.id, childrenItems);
+    }
+  }
 </script>
 
 <div class="w-full">
   <div class="group flex items-center justify-between py-1.5 px-2 hover:bg-muted/50 rounded-md cursor-pointer transition-colors {currentId === category.id ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
-       onclick={() => onSelect(category)}>
+       onclick={() => onSelect(category)}
+       onkeydown={(e) => e.key === 'Enter' && onSelect(category)}
+       role="button"
+       tabindex="0">
     
     <div class="flex items-center gap-2 overflow-hidden" style="padding-left: {depth * 1.2}rem;">
+      <div class="cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-foreground transition-colors p-0.5">
+        <GripVertical class="h-4 w-4" />
+      </div>
+
       <button 
         type="button"
         class="p-0.5 hover:bg-muted rounded-md text-muted-foreground shrink-0 transition-colors {category.children.length === 0 ? 'invisible' : ''}"
@@ -63,18 +89,24 @@
     </div>
   </div>
 
-  {#if category.children.length > 0 && isOpen}
+  {#if isOpen}
     <div transition:slide={{ duration: 150 }} class="relative mt-0.5">
-      <div class="absolute top-0 bottom-0 border-l border-border/60 pointer-events-none" style="left: {depth * 1.2 + 0.6 + 0.5}rem;"></div>
-      <div class="flex flex-col gap-0.5">
-        {#each category.children as child (child.id)}
-          <CategoryNode
-            category={child}
-            currentId={currentId}
-            depth={depth + 1}
-            {onCreateChild}
-            {onSelect}
-          />
+      <div class="absolute top-0 bottom-0 border-l border-border/60 pointer-events-none" style="left: {depth * 1.2 + 0.6 + 0.5 + 1.2}rem;"></div>
+      <div class="flex flex-col gap-0.5 min-h-[10px]"
+           use:dndzone={{ items: childrenItems, type: 'category', flipDurationMs: 200, dropTargetStyle: { outline: '2px dashed rgba(var(--primary), 0.4)', borderRadius: '0.375rem' } }}
+           onconsider={handleConsider}
+           onfinalize={handleFinalize}>
+        {#each childrenItems as child (child.id)}
+          <div animate:flip={{ duration: 200 }}>
+            <CategoryNode
+              category={child}
+              currentId={currentId}
+              depth={depth + 1}
+              {onCreateChild}
+              {onSelect}
+              {onReorder}
+            />
+          </div>
         {/each}
       </div>
     </div>

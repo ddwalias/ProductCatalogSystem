@@ -15,6 +15,7 @@
     updateProduct,
     deleteProduct,
   } from "../../lib/api";
+  import { reportFrontendError } from "$lib/telemetry";
   import type { CategoryTreeItem, ProductDetail } from "../../lib/types";
   import {
     Plus,
@@ -278,7 +279,9 @@
       originalFormSnapshot = JSON.stringify(productForm);
       sheetOpen = true;
     } catch (err) {
-      console.error("Failed to load product details for editing", err);
+      reportFrontendError("Failed to load product details for editing", err, {
+        "app.feature": "products.edit",
+      });
     }
   }
 
@@ -298,7 +301,11 @@
     try {
       viewProductDetail = await getProduct(id, version);
     } catch (err) {
-      console.error("Failed to fetch product version", err);
+      reportFrontendError("Failed to fetch product version", err, {
+        "app.feature": "products.version-view",
+        "product.id": id,
+        "product.version": version,
+      });
     } finally {
       isFetchingVersion = false;
     }
@@ -339,7 +346,10 @@
       });
       // viewDialogOpen = false; -> we'll let onSuccess handle closing, or user closing if error
     } catch (err) {
-      console.error("Failed to restore version", err);
+      reportFrontendError("Failed to restore version", err, {
+        "app.feature": "products.version-restore",
+        "product.id": viewingProduct.id,
+      });
     } finally {
       isRestoring = false;
     }

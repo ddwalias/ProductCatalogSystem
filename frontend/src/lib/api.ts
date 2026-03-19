@@ -9,6 +9,7 @@ import type {
   ProductUpdatePayload,
   ProductWritePayload,
 } from './types';
+import { logFrontendWarning, reportFrontendError } from './telemetry';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -41,17 +42,32 @@ function buildQuery(params: Record<string, string | number | null | undefined>):
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    headers: {
-      Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
-    ...init,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(path, {
+      headers: {
+        Accept: 'application/json',
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...init?.headers,
+      },
+      ...init,
+    });
+  } catch (error) {
+    reportFrontendError('API request failed before receiving a response', error, {
+      'http.request.method': init?.method ?? 'GET',
+      'url.full': path,
+    });
+    throw error;
+  }
 
   if (!response.ok) {
     const fallbackMessage = `Request failed with status ${response.status}.`;
+    logFrontendWarning('API request returned a non-success status code', {
+      'http.request.method': init?.method ?? 'GET',
+      'http.response.status_code': response.status,
+      'url.full': path,
+    });
 
     try {
       const problem = (await response.json()) as ProblemDetailsResponse;

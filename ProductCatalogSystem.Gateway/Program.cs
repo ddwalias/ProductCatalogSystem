@@ -2,6 +2,8 @@ using Yarp.ReverseProxy.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
+
 var enableHttpsRedirection = builder.Environment.IsProduction();
 
 if (enableHttpsRedirection)
@@ -15,6 +17,20 @@ if (enableHttpsRedirection)
 builder.Services.AddReverseProxy()
     .LoadFromMemory(
         [
+            new RouteConfig
+            {
+                RouteId = "dashboard-otlp",
+                ClusterId = "compose-dashboard-otlp",
+                Order = -200,
+                Match = new RouteMatch { Path = "/dashboard-otlp/{**catch-all}" },
+                Transforms =
+                [
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["PathRemovePrefix"] = "/dashboard-otlp"
+                    }
+                ]
+            },
             new RouteConfig
             {
                 RouteId = "server-health",
@@ -44,6 +60,7 @@ builder.Services.AddReverseProxy()
             }
         ],
         [
+            BuildCluster("compose-dashboard-otlp", "http://compose-dashboard:18890"),
             BuildCluster("server", ResolveServiceAddress(builder.Configuration, "server", "https")
                 ?? ResolveServiceAddress(builder.Configuration, "server", "http")),
             BuildCluster("webfrontend", ResolveServiceAddress(builder.Configuration, "webfrontend", "http")
@@ -62,6 +79,9 @@ if (enableHttpsRedirection)
 {
     app.UseHttpsRedirection();
 }
+
+app.MapDefaultEndpoints();
+
 app.MapReverseProxy();
 
 app.Run();

@@ -28,6 +28,9 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.Property(category => category.RowVersion)
             .IsRowVersion();
 
+        builder.Property(category => category.DisplayOrder)
+            .HasColumnType("decimal(18,8)");
+
         builder.HasIndex(category => category.ParentCategoryId);
         builder.HasIndex(category => new { category.Status, category.ParentCategoryId });
         builder.HasIndex(category => new { category.ParentCategoryId, category.DisplayOrder })

@@ -10,6 +10,7 @@
   import type { CategoryTreeItem, CategoryWritePayload, CategoryUpdatePayload } from '../../lib/types';
   import { Folders, Plus, Layers, RefreshCw, BarChart, ChevronRight } from 'lucide-svelte';
   import { dndzone } from 'svelte-dnd-action';
+  import type { DndEvent } from 'svelte-dnd-action';
   import { flip } from 'svelte/animate';
 
   // Shadcn Components
@@ -30,7 +31,7 @@
     name: z.string().min(1, "Name is required"),
     parentCategoryId: z.string().optional(),
     status: z.enum(["Active", "Inactive"]),
-    displayOrder: z.coerce.number().int().min(0, "Order must be 0 or greater").default(10),
+    displayOrder: z.coerce.number().min(0, "Order must be 0 or greater").default(10),
     description: z.string().optional()
   });
 
@@ -150,32 +151,60 @@
     isError = false;
   }
 
-  function handleRootConsider(e: CustomEvent<any>) {
+  type ReorderEvent = CustomEvent<DndEvent<CategoryTreeItem>>;
+
+  function handleRootConsider(e: ReorderEvent) {
     rootCategories = e.detail.items;
   }
 
-  function handleRootFinalize(e: CustomEvent<any>) {
+  function handleRootFinalize(e: ReorderEvent) {
     rootCategories = e.detail.items;
-    handleReorder(null, rootCategories);
+    handleReorder(null, rootCategories, Number(e.detail.info.id));
   }
 
-  function handleReorder(parentId: number | null, newItems: CategoryTreeItem[]) {
-    newItems.forEach((item, index) => {
-      const newOrder = (index + 1) * 10;
-      if (item.displayOrder !== newOrder || item.parentCategoryId !== parentId) {
-        updateCatMutation.mutate({
-          id: item.id,
-          payload: {
-            name: item.name,
-            description: item.description,
-            parentCategoryId: parentId,
-            status: item.status,
-            displayOrder: newOrder,
-            rowVersion: item.rowVersion
-          }
-        });
+  function handleReorder(parentId: number | null, newItems: CategoryTreeItem[], movedCategoryId: number) {
+    const movedIndex = newItems.findIndex((item) => item.id === movedCategoryId);
+    if (movedIndex === -1) {
+      return;
+    }
+
+    const movedItem = newItems[movedIndex];
+    const previousSibling = movedIndex > 0 ? newItems[movedIndex - 1] : null;
+    const nextSibling = movedIndex < newItems.length - 1 ? newItems[movedIndex + 1] : null;
+    const newOrder = computeDisplayOrder(previousSibling?.displayOrder ?? null, nextSibling?.displayOrder ?? null);
+
+    if (movedItem.displayOrder === newOrder && movedItem.parentCategoryId === parentId) {
+      return;
+    }
+
+    updateCatMutation.mutate({
+      id: movedItem.id,
+      payload: {
+        parentCategoryId: parentId,
+        displayOrder: newOrder,
+        rowVersion: movedItem.rowVersion
       }
     });
+  }
+
+  function computeDisplayOrder(previousOrder: number | null, nextOrder: number | null) {
+    if (previousOrder === null && nextOrder === null) {
+      return 10;
+    }
+
+    if (previousOrder === null) {
+      return roundDisplayOrder(nextOrder! / 2);
+    }
+
+    if (nextOrder === null) {
+      return roundDisplayOrder(previousOrder + 10);
+    }
+
+    return roundDisplayOrder((previousOrder + nextOrder) / 2);
+  }
+
+  function roundDisplayOrder(value: number) {
+    return Number(value.toFixed(8));
   }
 
   function beginCreateCategory(parentCategoryId: number | null = null) {
@@ -401,7 +430,7 @@
                 <Form.Control>
                   {#snippet children({ props })}
                     <Form.Label>Order Position</Form.Label>
-                    <Input {...props} type="number" bind:value={$formData.displayOrder} />
+                    <Input {...props} type="number" step="0.00000001" bind:value={$formData.displayOrder} />
                   {/snippet}
                 </Form.Control>
                 <Form.FieldErrors />

@@ -12,5 +12,5 @@ public class CreateCategoryRequest
 
     public CategoryStatus Status { get; set; } = CategoryStatus.Active;
 
-    public int DisplayOrder { get; set; }
+    public decimal DisplayOrder { get; set; }
 }

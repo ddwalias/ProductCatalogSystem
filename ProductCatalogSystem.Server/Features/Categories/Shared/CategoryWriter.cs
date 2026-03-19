@@ -18,11 +18,14 @@ public sealed class CategoryWriter(
     CatalogDbContext dbContext,
     ILogger<CategoryWriter> logger) : ICategoryWriter
 {
+    private const int DisplayOrderScale = 8;
+
     public async Task<ServiceResult<CategoryTreeItemDto>> CreateAsync(
         CreateCategoryRequest request,
         CancellationToken cancellationToken)
     {
-        var validationErrors = await ValidateCategoryRequestAsync(request.ParentCategoryId, request.DisplayOrder, null, cancellationToken);
+        var normalizedDisplayOrder = NormalizeDisplayOrder(request.DisplayOrder);
+        var validationErrors = await ValidateCategoryRequestAsync(request.ParentCategoryId, normalizedDisplayOrder, null, cancellationToken);
         if (validationErrors.Count > 0)
         {
             return new ServiceResult<CategoryTreeItemDto>(ResultStatus.ValidationFailed, Errors: validationErrors);
@@ -34,7 +37,7 @@ public sealed class CategoryWriter(
             Description = request.Description?.Trim(),
             ParentCategoryId = request.ParentCategoryId,
             Status = request.Status,
-            DisplayOrder = request.DisplayOrder
+            DisplayOrder = normalizedDisplayOrder
         };
 
         dbContext.Categories.Add(category);
@@ -91,7 +94,9 @@ public sealed class CategoryWriter(
         var updatedDescription = request.HasDescription ? request.Description?.Trim() : category.Description;
         var updatedParentCategoryId = request.HasParentCategoryId ? request.ParentCategoryId : category.ParentCategoryId;
         var updatedStatus = request.HasStatus ? request.Status!.Value : category.Status;
-        var updatedDisplayOrder = request.HasDisplayOrder ? request.DisplayOrder!.Value : category.DisplayOrder;
+        var updatedDisplayOrder = request.HasDisplayOrder
+            ? NormalizeDisplayOrder(request.DisplayOrder!.Value)
+            : category.DisplayOrder;
 
         var validationErrors = await ValidateCategoryRequestAsync(updatedParentCategoryId, updatedDisplayOrder, id, cancellationToken);
         if (validationErrors.Count > 0)
@@ -141,13 +146,13 @@ public sealed class CategoryWriter(
 
     private async Task<Dictionary<string, string[]>> ValidateCategoryRequestAsync(
         long? parentCategoryId,
-        int displayOrder,
+        decimal displayOrder,
         long? categoryId,
         CancellationToken cancellationToken)
     {
         var errors = new Dictionary<string, string[]>();
 
-        if (displayOrder < 0)
+        if (displayOrder < 0m)
         {
             errors[nameof(CreateCategoryRequest.DisplayOrder)] = ["Display order must be non-negative."];
         }
@@ -191,6 +196,9 @@ public sealed class CategoryWriter(
 
         return errors;
     }
+
+    private static decimal NormalizeDisplayOrder(decimal displayOrder)
+        => decimal.Round(displayOrder, DisplayOrderScale, MidpointRounding.AwayFromZero);
 
     private async Task<bool> WouldCreateCycleAsync(long categoryId, long proposedParentId, CancellationToken cancellationToken)
     {

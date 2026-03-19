@@ -6,7 +6,7 @@ public sealed record CategorySummaryDto(
     long Id,
     string Name,
     CategoryStatus Status,
-    int DisplayOrder);
+    decimal DisplayOrder);
 
 public sealed record CategoryTreeItemDto(
     long Id,
@@ -14,7 +14,7 @@ public sealed record CategoryTreeItemDto(
     string Name,
     string? Description,
     CategoryStatus Status,
-    int DisplayOrder,
+    decimal DisplayOrder,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     string RowVersion,

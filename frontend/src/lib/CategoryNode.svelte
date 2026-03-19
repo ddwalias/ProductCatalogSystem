@@ -5,6 +5,7 @@
   import { slide } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { dndzone } from 'svelte-dnd-action';
+  import type { DndEvent } from 'svelte-dnd-action';
 
   interface Props {
     category: CategoryTreeItem;
@@ -12,7 +13,7 @@
     depth?: number;
     onSelect: (category: CategoryTreeItem) => void;
     onCreateChild: (parentCategoryId?: number | null) => void;
-    onReorder?: (parentId: number | null, newItems: CategoryTreeItem[]) => void;
+    onReorder?: (parentId: number | null, newItems: CategoryTreeItem[], movedCategoryId: number) => void;
   }
 
   let { category, currentId, depth = 0, onSelect, onCreateChild, onReorder }: Props = $props();
@@ -24,14 +25,16 @@
     childrenItems = [...category.children];
   });
 
-  function handleConsider(e: CustomEvent<any>) {
+  type ReorderEvent = CustomEvent<DndEvent<CategoryTreeItem>>;
+
+  function handleConsider(e: ReorderEvent) {
     childrenItems = e.detail.items;
   }
 
-  function handleFinalize(e: CustomEvent<any>) {
+  function handleFinalize(e: ReorderEvent) {
     childrenItems = e.detail.items;
     if (onReorder) {
-      onReorder(category.id, childrenItems);
+      onReorder(category.id, childrenItems, Number(e.detail.info.id));
     }
   }
 </script>

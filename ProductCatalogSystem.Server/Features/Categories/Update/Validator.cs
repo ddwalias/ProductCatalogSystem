@@ -31,6 +31,11 @@ public sealed class Validator : Validator<UpdateCategoryRequest>
             .GreaterThanOrEqualTo(0)
             .When(request => request.HasDisplayOrder && request.DisplayOrder is not null);
 
+        RuleFor(request => request)
+            .Must(request => !(request.HasParentCategoryId && !request.HasDisplayOrder))
+            .WithMessage("Display Order is required when changing parent category.")
+            .OverridePropertyName(nameof(UpdateCategoryRequest.DisplayOrder));
+
         RuleFor(request => request.RowVersion)
             .Must(rowVersion => !string.IsNullOrWhiteSpace(rowVersion))
             .WithMessage("Row Version is required.");

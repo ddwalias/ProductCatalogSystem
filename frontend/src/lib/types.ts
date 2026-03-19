@@ -71,6 +71,6 @@ export interface CategoryWritePayload {
   displayOrder: number;
 }
 
-export interface CategoryUpdatePayload extends CategoryWritePayload {
+export interface CategoryUpdatePayload extends Partial<CategoryWritePayload> {
   rowVersion: string;
 }

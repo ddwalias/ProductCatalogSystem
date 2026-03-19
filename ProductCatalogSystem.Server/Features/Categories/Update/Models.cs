@@ -9,7 +9,7 @@ public sealed class UpdateCategoryRequest
     private string? description;
     private long? parentCategoryId;
     private CategoryStatus? status;
-    private int? displayOrder;
+    private decimal? displayOrder;
 
     [JsonIgnore]
     public bool HasName { get; private set; }
@@ -66,7 +66,7 @@ public sealed class UpdateCategoryRequest
     [JsonIgnore]
     public bool HasDisplayOrder { get; private set; }
 
-    public int? DisplayOrder
+    public decimal? DisplayOrder
     {
         get => displayOrder;
         set

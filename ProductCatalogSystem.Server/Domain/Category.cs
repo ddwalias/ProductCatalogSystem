@@ -12,7 +12,7 @@ public sealed class Category : AuditableEntity
 
     public CategoryStatus Status { get; set; }
 
-    public int DisplayOrder { get; set; }
+    public decimal DisplayOrder { get; set; }
 
     public byte[] RowVersion { get; set; } = [];
 

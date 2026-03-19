@@ -3,6 +3,7 @@ using FastEndpoints;
 using FastEndpoints.Swagger;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using ProductCatalogSystem.Server.Data;
 using ProductCatalogSystem.Server.Features;
 using ProductCatalogSystem.Server.Features.Products.Search;
@@ -39,14 +40,12 @@ builder.Services.SwaggerDocument(options =>
         settings.Description = "Interactive API explorer for the Product Catalog System.";
     };
 });
-builder.AddSqlServerDbContext<CatalogDbContext>(
-    "catalogdb",
-    configureDbContextOptions: options =>
+builder.Services.AddScoped<IInterceptor, ProductSearchMessageInterceptor>();
+builder.Services.AddScoped<IInterceptor, EntityLifecycleInterceptor>();
+builder.Services.AddScoped<IInterceptor, InventoryTransactionInterceptor>();
+builder.Services.AddDbContext<CatalogDbContext>(options =>
     {
-        options.AddInterceptors(
-            new ProductSearchMessageInterceptor(),
-            new EntityLifecycleInterceptor(),
-            new InventoryTransactionInterceptor());
+        options.UseSqlServer(catalogConnectionString);
 
         if (!shouldSeedCatalog)
         {
@@ -57,6 +56,7 @@ builder.AddSqlServerDbContext<CatalogDbContext>(
         options.UseAsyncSeeding((context, _, cancellationToken) =>
             DbInitializer.SeedCatalogAsync((CatalogDbContext)context, cancellationToken));
     });
+builder.EnrichSqlServerDbContext<CatalogDbContext>();
 
 if (hasMessageTransport)
 {

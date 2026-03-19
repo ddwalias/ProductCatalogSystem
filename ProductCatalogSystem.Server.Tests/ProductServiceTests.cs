@@ -337,7 +337,7 @@ public sealed class ProductServiceTests
         var options = new DbContextOptionsBuilder<CatalogDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .AddInterceptors(
-                new ProductSearchMessageInterceptor(),
+                new ProductSearchMessageInterceptor(new NoOpProductSearchMessagePublisher()),
                 new EntityLifecycleInterceptor(),
                 new InventoryTransactionInterceptor())
             .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))

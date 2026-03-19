@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using ProductCatalogSystem.Server.Features.Products.Search;
 
 namespace ProductCatalogSystem.Server.Data;
 
-public sealed class ProductSearchMessageInterceptor : SaveChangesInterceptor
+public sealed class ProductSearchMessageInterceptor(
+    IProductSearchMessagePublisher productSearchMessagePublisher) : SaveChangesInterceptor
 {
     public override InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,
@@ -58,20 +60,22 @@ public sealed class ProductSearchMessageInterceptor : SaveChangesInterceptor
         }
     }
 
-    private static void PublishPendingProductSearchMessages(DbContext? context)
+    private void PublishPendingProductSearchMessages(DbContext? context)
     {
         if (context is CatalogDbContext catalogDbContext)
         {
-            catalogDbContext.PublishPendingProductSearchMessages();
+            catalogDbContext.PublishPendingProductSearchMessages(productSearchMessagePublisher);
         }
     }
 
-    private static Task PublishPendingProductSearchMessagesAsync(
+    private Task PublishPendingProductSearchMessagesAsync(
         DbContext? context,
         CancellationToken cancellationToken)
     {
         return context is CatalogDbContext catalogDbContext
-            ? catalogDbContext.PublishPendingProductSearchMessagesAsync(cancellationToken)
+            ? catalogDbContext.PublishPendingProductSearchMessagesAsync(
+                productSearchMessagePublisher,
+                cancellationToken)
             : Task.CompletedTask;
     }
 

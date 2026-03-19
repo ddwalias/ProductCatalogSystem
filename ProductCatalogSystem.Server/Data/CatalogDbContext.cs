@@ -8,20 +8,11 @@ namespace ProductCatalogSystem.Server.Data;
 
 public sealed class CatalogDbContext : DbContext
 {
-    private readonly IProductSearchMessagePublisher _productSearchMessagePublisher;
     private readonly ProductSearchChangeBuffer _productSearchChanges = new();
 
     public CatalogDbContext(DbContextOptions<CatalogDbContext> options)
-        : this(options, new NoOpProductSearchMessagePublisher())
-    {
-    }
-
-    public CatalogDbContext(
-        DbContextOptions<CatalogDbContext> options,
-        IProductSearchMessagePublisher productSearchMessagePublisher)
         : base(options)
     {
-        this._productSearchMessagePublisher = productSearchMessagePublisher;
         ChangeTracker.CascadeDeleteTiming = CascadeTiming.OnSaveChanges;
         ChangeTracker.DeleteOrphansTiming = CascadeTiming.OnSaveChanges;
     }
@@ -59,10 +50,12 @@ public sealed class CatalogDbContext : DbContext
         _productSearchChanges.ReplacePending(GetSearchTrackedProductEntries().Select(CreateProductSearchChange));
     }
 
-    internal void PublishPendingProductSearchMessages()
-        => PublishPendingProductSearchMessagesAsync(CancellationToken.None).GetAwaiter().GetResult();
+    internal void PublishPendingProductSearchMessages(IProductSearchMessagePublisher productSearchMessagePublisher)
+        => PublishPendingProductSearchMessagesAsync(productSearchMessagePublisher, CancellationToken.None).GetAwaiter().GetResult();
 
-    internal async Task PublishPendingProductSearchMessagesAsync(CancellationToken cancellationToken)
+    internal async Task PublishPendingProductSearchMessagesAsync(
+        IProductSearchMessagePublisher productSearchMessagePublisher,
+        CancellationToken cancellationToken)
     {
         if (!_productSearchChanges.TryBeginPublishing(out var changes))
         {
@@ -73,7 +66,7 @@ public sealed class CatalogDbContext : DbContext
         {
             foreach (var change in changes)
             {
-                await PublishProductSearchChangeAsync(change, cancellationToken);
+                await PublishProductSearchChangeAsync(productSearchMessagePublisher, change, cancellationToken);
             }
 
             if (ChangeTracker.HasChanges())
@@ -166,13 +159,14 @@ public sealed class CatalogDbContext : DbContext
             entry.State == EntityState.Deleted ? ProductSearchChangeKind.Delete : ProductSearchChangeKind.Upsert);
     }
 
-    private Task PublishProductSearchChangeAsync(
+    private static Task PublishProductSearchChangeAsync(
+        IProductSearchMessagePublisher productSearchMessagePublisher,
         ProductSearchChange change,
         CancellationToken cancellationToken)
     {
         return change.Kind == ProductSearchChangeKind.Delete
-            ? _productSearchMessagePublisher.PublishDeleteAsync(change.Product.Id, cancellationToken)
-            : _productSearchMessagePublisher.PublishUpsertAsync(change.Product.Id, cancellationToken);
+            ? productSearchMessagePublisher.PublishDeleteAsync(change.Product.Id, cancellationToken)
+            : productSearchMessagePublisher.PublishUpsertAsync(change.Product.Id, cancellationToken);
     }
 
     private sealed record ProductSearchChange(Product Product, ProductSearchChangeKind Kind);

@@ -1,6 +1,6 @@
 # Product Catalog System
 
-Production-minded catalog assessment built as a modular monolith with:
+Product catalog system assessment built as a modular monolith with:
 
 - ASP.NET Core Web API on .NET 10
 - Entity Framework Core with SQL Server
@@ -26,24 +26,16 @@ Production-minded catalog assessment built as a modular monolith with:
 
 ## Run locally
 
-Prerequisite: Docker must have the `buildx` plugin available because Aspire uses Dockerfile-based image builds for the local SQL Server full-text image.
-
-On Arch Linux:
-
-```bash
-sudo pacman -S docker-buildx
-```
-
-You can verify it with:
-
-```bash
-docker buildx version
-```
-
 From the repository root:
 
 ```bash
 aspire run
+```
+
+A local Aspire run exposes the gateway over HTTP. Use the URL shown by Aspire, for example:
+
+```text
+http://gateway-productcatalogsystem.dev.localhost:5520
 ```
 
 Aspire starts:
@@ -51,7 +43,8 @@ Aspire starts:
 - SQL Server
 - Elasticsearch
 - `ProductCatalogSystem.Server`
-- the Vite frontend
+- the Vite frontend dev server
+- the YARP gateway
 - the Aspire dashboard
 
 The frontend and API endpoints are injected by Aspire at runtime. During local development, the frontend uses the Vite dev server and proxies `/api` requests to the server.
@@ -60,7 +53,13 @@ The frontend and API endpoints are injected by Aspire at runtime. During local d
 
 The app host now defines a Docker Compose environment named `compose`. Aspire can publish the existing SQL Server, Elasticsearch, server, and gateway resources into a generated Docker Compose deployment.
 
-During local development, the frontend still runs through the Vite dev server. During Aspire publish/deploy flows, the frontend build output is bundled into the server container so the generated Docker Compose deployment does not depend on a separate Vite service.
+During local development, the frontend runs through the Vite dev server. In publish mode, the app host switches to a Dockerfile-based frontend resource so the generated compose deployment includes:
+
+- `sql`
+- `elasticsearch`
+- `server`
+- `webfrontend`
+- `gateway`
 
 Generate the compose artifacts without starting containers:
 
@@ -92,7 +91,7 @@ Backend build and tests:
 
 ```bash
 dotnet build ProductCatalogSystem.sln
-dotnet test ProductCatalogSystem.sln --no-build
+dotnet test ProductCatalogSystem.sln
 ```
 
 Frontend build:
@@ -107,21 +106,27 @@ npm run build
 
 - `GET /api/products`
 - `GET /api/products?query=wireless`
+- `GET /api/products/search`
 - `GET /api/products/{id}`
 - `POST /api/products`
 - `PUT /api/products/{id}`
 - `DELETE /api/products/{id}`
-- `GET /api/products/search`
 - `GET /api/categories`
+- `GET /api/categories/{id}/products`
 - `POST /api/categories`
 - `PUT /api/categories/{id}`
-- `GET /api/categories/{id}/products`
-- `GET /health`
-- `GET /swagger`
+- `GET /api/health`
+
+## Database and seed data
+
+- The database schema is created through EF Core migrations in `ProductCatalogSystem.Server/Data/Migrations`.
+- The API applies migrations on startup.
+- In development, the API seeds sample data automatically.
+- In production, seed data runs only when `SeedCatalogOnStartup=true`.
+- The current seed set creates `10` categories and `100` unique products.
 
 ## Notes
 
-- The database schema is created through EF Core migrations in `ProductCatalogSystem.Server/Data/Migrations`.
-- The API applies migrations and seeds sample data on startup.
 - In development, the interactive API explorer is available at `/swagger`.
 - Local HTTPS developer certificates are not fully trusted in this environment. HTTP endpoints still work; if you want trusted local HTTPS on Linux, configure `SSL_CERT_DIR` as suggested by the `aspire run` output.
+- Search indexing uses Elasticsearch when available. If Elasticsearch is unhealthy, the API falls back to database-backed product queries instead of failing startup.

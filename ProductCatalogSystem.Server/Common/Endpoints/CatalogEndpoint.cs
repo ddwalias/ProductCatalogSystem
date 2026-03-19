@@ -33,18 +33,4 @@ public abstract class CatalogEndpoint<TRequest, TResponse> : Endpoint<TRequest, 
     }
 }
 
-public abstract class CatalogEndpointWithoutRequest<TResponse> : EndpointWithoutRequest<TResponse>
-{
-    protected async Task<bool> TryHandleServiceResultAsync(
-        ServiceResult<TResponse> result,
-        CancellationToken cancellationToken)
-    {
-        if (result.Status == ResultStatus.Success)
-        {
-            return false;
-        }
-
-        await HttpContext.WriteServiceResultAsync(result, cancellationToken);
-        return true;
-    }
-}
+public abstract class CatalogEndpointWithoutRequest<TResponse> : EndpointWithoutRequest<TResponse>;

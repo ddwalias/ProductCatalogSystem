@@ -70,9 +70,7 @@ public sealed class ProductServiceTests
                 Name = "Tracked Product",
                 CategoryId = 1,
                 Price = 25m,
-                InventoryOnHand = 7,
-                InventoryReason = "Initial load",
-                ChangedBy = "tester"
+                InventoryOnHand = 7
             },
             CancellationToken.None);
 
@@ -85,8 +83,6 @@ public sealed class ProductServiceTests
         transaction.BeforeQty.Should().Be(0);
         transaction.AfterQty.Should().Be(7);
         transaction.Delta.Should().Be(7);
-        transaction.Reason.Should().Be("Initial load");
-        transaction.ChangedBy.Should().Be("tester");
         transaction.ProductId.Should().Be(result.Value!.Id);
     }
 
@@ -129,9 +125,7 @@ public sealed class ProductServiceTests
                 CategoryId = 1,
                 Price = 50m,
                 InventoryOnHand = 8,
-                RowVersion = RowVersionConverter.Encode([1]),
-                InventoryReason = "Restocked",
-                ChangedBy = "tester"
+                RowVersion = RowVersionConverter.Encode([1])
             },
             CancellationToken.None);
 
@@ -143,8 +137,6 @@ public sealed class ProductServiceTests
         transaction.BeforeQty.Should().Be(5);
         transaction.AfterQty.Should().Be(8);
         transaction.Delta.Should().Be(3);
-        transaction.Reason.Should().Be("Restocked");
-        transaction.ChangedBy.Should().Be("tester");
         transaction.ProductId.Should().Be(1);
 
         (await dbContext.InventoryTransactions.CountAsync()).Should().Be(2);
@@ -344,7 +336,10 @@ public sealed class ProductServiceTests
     {
         var options = new DbContextOptionsBuilder<CatalogDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .AddInterceptors(new EntityLifecycleInterceptor(), new InventoryTransactionInterceptor())
+            .AddInterceptors(
+                new ProductSearchMessageInterceptor(),
+                new EntityLifecycleInterceptor(),
+                new InventoryTransactionInterceptor())
             .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
@@ -353,7 +348,10 @@ public sealed class ProductServiceTests
 
     private static ProductReader CreateProductReader(CatalogDbContext dbContext)
     {
-        return new ProductReader(dbContext, new NoOpProductSearchIndex());
+        return new ProductReader(
+            dbContext,
+            new NoOpProductSearchIndex(),
+            NullLogger<ProductReader>.Instance);
     }
 
     private static ProductWriter CreateProductWriter(CatalogDbContext dbContext)
@@ -361,7 +359,6 @@ public sealed class ProductServiceTests
         return new ProductWriter(
             dbContext,
             NullLogger<ProductWriter>.Instance,
-            CreateProductReader(dbContext),
-            new NoOpProductSearchMessagePublisher());
+            CreateProductReader(dbContext));
     }
 }

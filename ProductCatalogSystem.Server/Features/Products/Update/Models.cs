@@ -12,8 +12,6 @@ public sealed class UpdateProductRequest
     private long? categoryId;
     private string? primaryImageUrl;
     private JsonObject? customAttributes;
-    private string? inventoryReason;
-    private string? changedBy;
 
     [JsonIgnore]
     public bool HasName { get; private set; }
@@ -103,32 +101,6 @@ public sealed class UpdateProductRequest
         {
             HasCustomAttributes = true;
             customAttributes = value;
-        }
-    }
-
-    [JsonIgnore]
-    public bool HasInventoryReason { get; private set; }
-
-    public string? InventoryReason
-    {
-        get => inventoryReason;
-        set
-        {
-            HasInventoryReason = true;
-            inventoryReason = value;
-        }
-    }
-
-    [JsonIgnore]
-    public bool HasChangedBy { get; private set; }
-
-    public string? ChangedBy
-    {
-        get => changedBy;
-        set
-        {
-            HasChangedBy = true;
-            changedBy = value;
         }
     }
 

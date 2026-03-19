@@ -41,15 +41,6 @@ public sealed class Validator : Validator<UpdateProductRequest>
             .When(request => request.HasPrimaryImageUrl && !string.IsNullOrWhiteSpace(request.PrimaryImageUrl))
             .WithMessage("Primary Image Url must be a valid absolute URL.")
             .MaximumLength(1000);
-
-        RuleFor(request => request.InventoryReason)
-            .MaximumLength(250)
-            .When(request => request.HasInventoryReason);
-
-        RuleFor(request => request.ChangedBy)
-            .MaximumLength(100)
-            .When(request => request.HasChangedBy);
-
         RuleFor(request => request.RowVersion)
             .Must(rowVersion => !string.IsNullOrWhiteSpace(rowVersion))
             .WithMessage("Row Version is required.");

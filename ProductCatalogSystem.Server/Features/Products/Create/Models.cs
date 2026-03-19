@@ -17,8 +17,4 @@ public class CreateProductRequest
     public string? PrimaryImageUrl { get; set; }
 
     public JsonObject? CustomAttributes { get; set; }
-
-    public string? InventoryReason { get; set; }
-
-    public string? ChangedBy { get; set; }
 }

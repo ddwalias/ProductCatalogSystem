@@ -44,6 +44,7 @@ builder.AddSqlServerDbContext<CatalogDbContext>(
     configureDbContextOptions: options =>
     {
         options.AddInterceptors(
+            new ProductSearchMessageInterceptor(),
             new EntityLifecycleInterceptor(),
             new InventoryTransactionInterceptor());
 

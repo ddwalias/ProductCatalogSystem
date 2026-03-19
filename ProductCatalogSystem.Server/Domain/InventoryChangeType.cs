@@ -4,5 +4,4 @@ public enum InventoryChangeType : byte
 {
     InitialStock = 1,
     ProductUpdate = 2,
-    ManualAdjustment = 3
 }

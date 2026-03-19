@@ -2,16 +2,26 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using ProductCatalogSystem.Server.Domain;
+using ProductCatalogSystem.Server.Features.Products.Search;
 
 namespace ProductCatalogSystem.Server.Data;
 
 public sealed class CatalogDbContext : DbContext
 {
-    private InventoryAuditMetadata? inventoryAuditMetadata;
+    private readonly IProductSearchMessagePublisher productSearchMessagePublisher;
+    private readonly ProductSearchChangeBuffer productSearchChanges = new();
 
     public CatalogDbContext(DbContextOptions<CatalogDbContext> options)
+        : this(options, new NoOpProductSearchMessagePublisher())
+    {
+    }
+
+    public CatalogDbContext(
+        DbContextOptions<CatalogDbContext> options,
+        IProductSearchMessagePublisher productSearchMessagePublisher)
         : base(options)
     {
+        this.productSearchMessagePublisher = productSearchMessagePublisher;
         ChangeTracker.CascadeDeleteTiming = CascadeTiming.OnSaveChanges;
         ChangeTracker.DeleteOrphansTiming = CascadeTiming.OnSaveChanges;
     }
@@ -21,11 +31,6 @@ public sealed class CatalogDbContext : DbContext
     public DbSet<Product> Products => Set<Product>();
 
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
-
-    public void UseInventoryAudit(string? reason, string? changedBy)
-    {
-        inventoryAuditMetadata = new InventoryAuditMetadata(reason, changedBy);
-    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,35 +43,80 @@ public sealed class CatalogDbContext : DbContext
 
     internal void ApplyInventoryTransactions()
     {
-        var productEntries = ChangeTracker.Entries<Product>()
-            .Where(entry => entry.State is EntityState.Added or EntityState.Modified)
-            .ToArray();
+        foreach (var entry in GetInventoryTrackedProductEntries())
+        {
+            AddInventoryTransaction(entry);
+        }
+    }
 
-        if (productEntries.Length == 0)
+    internal void CaptureProductSearchChanges()
+    {
+        if (productSearchChanges.IsPublishing)
         {
             return;
         }
 
-        foreach (var entry in productEntries)
+        productSearchChanges.ReplacePending(GetSearchTrackedProductEntries().Select(CreateProductSearchChange));
+    }
+
+    internal void PublishPendingProductSearchMessages()
+        => PublishPendingProductSearchMessagesAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+    internal async Task PublishPendingProductSearchMessagesAsync(CancellationToken cancellationToken)
+    {
+        if (!productSearchChanges.TryBeginPublishing(out var changes))
         {
-            if (entry.State == EntityState.Added)
+            return;
+        }
+
+        try
+        {
+            foreach (var change in changes)
             {
-                AddInitialInventoryTransaction(entry);
-                continue;
+                await PublishProductSearchChangeAsync(change, cancellationToken);
             }
 
-            AddInventoryUpdateTransaction(entry);
+            if (ChangeTracker.HasChanges())
+            {
+                await SaveChangesAsync(cancellationToken);
+            }
+        }
+        finally
+        {
+            productSearchChanges.EndPublishing();
         }
     }
 
-    internal void ClearInventoryAudit()
+    internal void ClearPendingProductSearchChanges()
     {
-        inventoryAuditMetadata = null;
+        productSearchChanges.Clear();
     }
 
-    private void AddInitialInventoryTransaction(EntityEntry<Product> entry)
+    private IEnumerable<EntityEntry<Product>> GetInventoryTrackedProductEntries()
     {
-        var product = entry.Entity;
+        return ChangeTracker.Entries<Product>()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified);
+    }
+
+    private IEnumerable<EntityEntry<Product>> GetSearchTrackedProductEntries()
+    {
+        return ChangeTracker.Entries<Product>()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted);
+    }
+
+    private void AddInventoryTransaction(EntityEntry<Product> entry)
+    {
+        if (entry.State == EntityState.Added)
+        {
+            AddInitialInventoryTransaction(entry.Entity);
+            return;
+        }
+
+        AddInventoryUpdateTransaction(entry);
+    }
+
+    private void AddInitialInventoryTransaction(Product product)
+    {
         if (product.InventoryOnHand <= 0)
         {
             return;
@@ -79,8 +129,6 @@ public sealed class CatalogDbContext : DbContext
             Delta = product.InventoryOnHand,
             BeforeQty = 0,
             AfterQty = product.InventoryOnHand,
-            Reason = inventoryAuditMetadata?.Reason ?? "Initial stock",
-            ChangedBy = inventoryAuditMetadata?.ChangedBy,
             CreatedAtUtc = product.CreatedAtUtc == default ? DateTime.UtcNow : product.CreatedAtUtc
         });
     }
@@ -107,11 +155,69 @@ public sealed class CatalogDbContext : DbContext
             Delta = afterQty - beforeQty,
             BeforeQty = beforeQty,
             AfterQty = afterQty,
-            Reason = inventoryAuditMetadata?.Reason ?? "Inventory updated with product edit",
-            ChangedBy = inventoryAuditMetadata?.ChangedBy,
             CreatedAtUtc = entry.Entity.UpdatedAtUtc == default ? DateTime.UtcNow : entry.Entity.UpdatedAtUtc
         });
     }
 
-    private sealed record InventoryAuditMetadata(string? Reason, string? ChangedBy);
+    private static ProductSearchChange CreateProductSearchChange(EntityEntry<Product> entry)
+    {
+        return new ProductSearchChange(
+            entry.Entity,
+            entry.State == EntityState.Deleted ? ProductSearchChangeKind.Delete : ProductSearchChangeKind.Upsert);
+    }
+
+    private Task PublishProductSearchChangeAsync(
+        ProductSearchChange change,
+        CancellationToken cancellationToken)
+    {
+        return change.Kind == ProductSearchChangeKind.Delete
+            ? productSearchMessagePublisher.PublishDeleteAsync(change.Product.Id, cancellationToken)
+            : productSearchMessagePublisher.PublishUpsertAsync(change.Product.Id, cancellationToken);
+    }
+
+    private sealed record ProductSearchChange(Product Product, ProductSearchChangeKind Kind);
+
+    private enum ProductSearchChangeKind
+    {
+        Upsert,
+        Delete
+    }
+
+    private sealed class ProductSearchChangeBuffer
+    {
+        private readonly List<ProductSearchChange> pending = [];
+
+        public bool IsPublishing { get; private set; }
+
+        public void ReplacePending(IEnumerable<ProductSearchChange> changes)
+        {
+            pending.Clear();
+            pending.AddRange(changes);
+        }
+
+        public bool TryBeginPublishing(out ProductSearchChange[] changes)
+        {
+            if (IsPublishing || pending.Count == 0)
+            {
+                changes = [];
+                return false;
+            }
+
+            changes = pending.ToArray();
+            pending.Clear();
+            IsPublishing = true;
+            return true;
+        }
+
+        public void EndPublishing()
+        {
+            IsPublishing = false;
+        }
+
+        public void Clear()
+        {
+            pending.Clear();
+            IsPublishing = false;
+        }
+    }
 }

@@ -343,7 +343,6 @@ public static class DbInitializer
         if (productsToAdd.Length > 0)
         {
             dbContext.Products.AddRange(productsToAdd);
-            dbContext.UseInventoryAudit("Seeded extended catalog inventory", "seed");
             dbContext.SaveChanges();
         }
 
@@ -425,7 +424,6 @@ public static class DbInitializer
         if (productsToAdd.Length > 0)
         {
             dbContext.Products.AddRange(productsToAdd);
-            dbContext.UseInventoryAudit("Seeded extended catalog inventory", "seed");
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 

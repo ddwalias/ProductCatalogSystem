@@ -24,7 +24,6 @@ public sealed class InventoryTransactionInterceptor : SaveChangesInterceptor
 
     public override int SavedChanges(SaveChangesCompletedEventData eventData, int result)
     {
-        ClearInventoryAudit(eventData.Context);
         return result;
     }
 
@@ -33,21 +32,7 @@ public sealed class InventoryTransactionInterceptor : SaveChangesInterceptor
         int result,
         CancellationToken cancellationToken = default)
     {
-        ClearInventoryAudit(eventData.Context);
         return ValueTask.FromResult(result);
-    }
-
-    public override void SaveChangesFailed(DbContextErrorEventData eventData)
-    {
-        ClearInventoryAudit(eventData.Context);
-    }
-
-    public override Task SaveChangesFailedAsync(
-        DbContextErrorEventData eventData,
-        CancellationToken cancellationToken = default)
-    {
-        ClearInventoryAudit(eventData.Context);
-        return Task.CompletedTask;
     }
 
     private static void ApplyInventoryTransactions(DbContext? context)
@@ -55,14 +40,6 @@ public sealed class InventoryTransactionInterceptor : SaveChangesInterceptor
         if (context is CatalogDbContext catalogDbContext)
         {
             catalogDbContext.ApplyInventoryTransactions();
-        }
-    }
-
-    private static void ClearInventoryAudit(DbContext? context)
-    {
-        if (context is CatalogDbContext catalogDbContext)
-        {
-            catalogDbContext.ClearInventoryAudit();
         }
     }
 }

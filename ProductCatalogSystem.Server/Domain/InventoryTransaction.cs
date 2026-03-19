@@ -14,10 +14,6 @@ public sealed class InventoryTransaction
 
     public int AfterQty { get; set; }
 
-    public string? Reason { get; set; }
-
-    public string? ChangedBy { get; set; }
-
     public DateTime CreatedAtUtc { get; set; }
 
     public Product Product { get; set; } = null!;

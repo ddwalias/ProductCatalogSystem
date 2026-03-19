@@ -23,12 +23,6 @@ public sealed class Validator : Validator<CreateProductRequest>
             .When(request => !string.IsNullOrWhiteSpace(request.PrimaryImageUrl))
             .WithMessage("Primary Image Url must be a valid absolute URL.")
             .MaximumLength(1000);
-
-        RuleFor(request => request.InventoryReason)
-            .MaximumLength(250);
-
-        RuleFor(request => request.ChangedBy)
-            .MaximumLength(100);
     }
 
     private static bool BeAValidAbsoluteUrl(string? value)

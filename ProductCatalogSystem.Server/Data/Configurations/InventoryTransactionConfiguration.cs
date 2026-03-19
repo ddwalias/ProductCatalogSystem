@@ -15,12 +15,6 @@ internal sealed class InventoryTransactionConfiguration : IEntityTypeConfigurati
         builder.Property(transaction => transaction.ChangeType)
             .HasConversion<byte>();
 
-        builder.Property(transaction => transaction.Reason)
-            .HasMaxLength(250);
-
-        builder.Property(transaction => transaction.ChangedBy)
-            .HasMaxLength(100);
-
         builder.HasOne(transaction => transaction.Product)
             .WithMany(product => product.InventoryTransactions)
             .HasForeignKey(transaction => transaction.ProductId)

@@ -3,7 +3,6 @@ using ProductCatalogSystem.Server.Common;
 using ProductCatalogSystem.Server.Data;
 using ProductCatalogSystem.Server.Domain;
 using ProductCatalogSystem.Server.Features.Products.Create;
-using ProductCatalogSystem.Server.Features.Products.Search;
 using ProductCatalogSystem.Server.Features.Products.Update;
 
 namespace ProductCatalogSystem.Server.Features.Products.Shared;
@@ -20,8 +19,7 @@ public interface IProductWriter
 public sealed class ProductWriter(
     CatalogDbContext dbContext,
     ILogger<ProductWriter> logger,
-    IProductReader productReader,
-    IProductSearchMessagePublisher productSearchMessagePublisher) : IProductWriter
+    IProductReader productReader) : IProductWriter
 {
     public async Task<ServiceResult<ProductDetailDto>> CreateAsync(
         CreateProductRequest request,
@@ -52,12 +50,9 @@ public sealed class ProductWriter(
             };
 
             dbContext.Products.Add(product);
-            dbContext.UseInventoryAudit(request.InventoryReason, request.ChangedBy);
 
             try
             {
-                await dbContext.SaveChangesAsync(cancellationToken);
-                await productSearchMessagePublisher.PublishUpsertAsync(product.Id, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
             catch (DbUpdateException exception) when (SqlServerWriteFailureClassifier.ClassifyProductFailure(exception) is { } classifiedFailure)
@@ -148,8 +143,6 @@ public sealed class ProductWriter(
 
             try
             {
-                dbContext.UseInventoryAudit(request.InventoryReason, request.ChangedBy);
-                await productSearchMessagePublisher.PublishUpsertAsync(product.Id, cancellationToken);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
             catch (DbUpdateConcurrencyException)
@@ -195,7 +188,6 @@ public sealed class ProductWriter(
 
             product.VersionNumber += 1;
             dbContext.Products.Remove(product);
-            await productSearchMessagePublisher.PublishDeleteAsync(product.Id, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 

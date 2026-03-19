@@ -322,6 +322,62 @@ public sealed class ProductServiceTests
     }
 
     [Fact]
+    public async Task GetProductsAsync_ShouldBypassSearchIndexWhenExplicitSortIsRequested()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.Categories.Add(new Category
+        {
+            Id = 1,
+            Name = "Active",
+            DisplayOrder = 10,
+            Status = CategoryStatus.Active,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            RowVersion = [1]
+        });
+        dbContext.Products.AddRange(
+            new Product
+            {
+                Id = 1,
+                Name = "Wireless Headphones",
+                Description = "Audio for focused work",
+                CategoryId = 1,
+                Price = 120m,
+                InventoryOnHand = 5,
+                VersionNumber = 1,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            },
+            new Product
+            {
+                Id = 2,
+                Name = "Wireless Mouse",
+                Description = "Mouse for productivity",
+                CategoryId = 1,
+                Price = 80m,
+                InventoryOnHand = 4,
+                VersionNumber = 1,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateProductReader(dbContext, new ThrowingProductSearchIndex());
+
+        var result = await service.GetProductsAsync(
+            new ProductListQuery
+            {
+                Query = "wireless",
+                SortBy = "price",
+                SortDir = "desc"
+            },
+            CancellationToken.None);
+
+        result.Items.Should().HaveCount(2);
+        result.Items.Select(item => item.Id).Should().ContainInOrder(1L, 2L);
+    }
+
+    [Fact]
     public async Task GetAutocompleteAsync_ShouldReturnPrefixMatchesFirst()
     {
         await using var dbContext = CreateDbContext();
@@ -400,11 +456,13 @@ public sealed class ProductServiceTests
         return new CatalogDbContext(options);
     }
 
-    private static ProductReader CreateProductReader(CatalogDbContext dbContext)
+    private static ProductReader CreateProductReader(
+        CatalogDbContext dbContext,
+        IProductSearchIndex? productSearchIndex = null)
     {
         return new ProductReader(
             dbContext,
-            new NoOpProductSearchIndex(),
+            productSearchIndex ?? new NoOpProductSearchIndex(),
             NullLogger<ProductReader>.Instance);
     }
 
@@ -414,5 +472,25 @@ public sealed class ProductServiceTests
             dbContext,
             NullLogger<ProductWriter>.Instance,
             CreateProductReader(dbContext));
+    }
+
+    private sealed class ThrowingProductSearchIndex : IProductSearchIndex
+    {
+        public bool IsEnabled => true;
+
+        public Task<IReadOnlyList<long>> AutocompleteAsync(string query, int limit, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("Search index should have been bypassed.");
+
+        public Task DeleteAsync(long productId, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("Search index should have been bypassed.");
+
+        public Task RebuildAsync(CancellationToken cancellationToken)
+            => throw new InvalidOperationException("Search index should have been bypassed.");
+
+        public Task<ProductSearchPage> SearchAsync(ProductListQuery query, PagingOptions paging, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("Search index should have been bypassed.");
+
+        public Task UpsertAsync(long productId, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("Search index should have been bypassed.");
     }
 }

@@ -28,6 +28,10 @@ public sealed class ProductListQuery
     public string NormalizedSortBy => string.IsNullOrWhiteSpace(SortBy) ? "name" : SortBy.Trim().ToLowerInvariant();
 
     public bool SortDescending => string.Equals(SortDir, "desc", StringComparison.OrdinalIgnoreCase);
+
+    public bool HasExplicitSort =>
+        !string.IsNullOrWhiteSpace(SortBy) ||
+        !string.IsNullOrWhiteSpace(SortDir);
 }
 
 public sealed class ProductAutocompleteQuery

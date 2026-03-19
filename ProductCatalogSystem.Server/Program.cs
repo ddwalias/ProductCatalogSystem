@@ -4,6 +4,7 @@ using FastEndpoints.Swagger;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using ProductCatalogSystem.Server.Data;
 using ProductCatalogSystem.Server.Features;
 using ProductCatalogSystem.Server.Features.Products.Search;
@@ -90,8 +91,15 @@ if (hasMessageTransport)
     });
 }
 
-builder.Services.AddHealthChecks()
+var healthChecks = builder.Services.AddHealthChecks()
     .AddDbContextCheck<CatalogDbContext>("catalog-db");
+
+if (hasElasticsearchConnection)
+{
+    healthChecks.AddCheck<ProductSearchHealthCheck>(
+        "product-search",
+        failureStatus: HealthStatus.Degraded);
+}
 
 builder.Services.AddCatalogFeatures(hasElasticsearchConnection, hasMessageTransport);
 
@@ -126,7 +134,6 @@ app.MapDefaultEndpoints();
 app.UseFileServer();
 
 await app.Services.EnsureCatalogDatabaseReadyAsync();
-await app.Services.InitializeProductSearchAsync();
 
 app.Run();
 

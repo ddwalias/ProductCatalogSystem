@@ -26,7 +26,9 @@ public sealed class ProductReader(
     {
         var paging = query.NormalizePaging();
 
-        if (!string.IsNullOrWhiteSpace(query.Query) && productSearchIndex.IsEnabled)
+        if (!string.IsNullOrWhiteSpace(query.Query) &&
+            productSearchIndex.IsEnabled &&
+            !query.HasExplicitSort)
         {
             try
             {

@@ -26,7 +26,7 @@ public sealed class ProductSearchIndexUnavailableException : Exception
 public sealed class ProductSearchIndexAvailabilityState
 {
     private readonly SemaphoreSlim unavailableSignal = new(0, 1);
-    private int isAvailable = 1;
+    private int isAvailable;
 
     public bool IsAvailable => Volatile.Read(ref isAvailable) == 1;
 
@@ -153,6 +153,7 @@ public sealed class ElasticsearchProductSearchIndex(
     private const string InfixAnalyzerName = "catalog_infix";
     private const string FoldedNormalizerName = "catalog_folded";
     private const int ClusterHealthTimeoutSeconds = 60;
+    private const int RecoveryBatchSize = 250;
 
     public bool IsEnabled => true;
 
@@ -255,27 +256,46 @@ public sealed class ElasticsearchProductSearchIndex(
         await WaitForClusterReadyAsync(cancellationToken);
         await RecreateIndexAsync(cancellationToken);
 
-        var products = await dbContext.Products
-            .AsNoTracking()
-            .Select(product => new ProductSearchDocument
-            {
-                Id = product.Id,
-                CategoryId = product.CategoryId,
-                Name = product.Name,
-                Description = product.Description,
-                Price = (double)product.Price,
-                UpdatedAtUtc = product.UpdatedAtUtc
-            })
-            .ToListAsync(cancellationToken);
+        var indexedCount = 0;
+        long lastProductId = 0;
 
-        foreach (var document in products)
+        while (!cancellationToken.IsCancellationRequested)
         {
-            var response = await client.IndexAsync(document, index => index.Index(IndexName).Id(document.Id), cancellationToken);
+            var products = await dbContext.Products
+                .AsNoTracking()
+                .Where(product => product.Id > lastProductId)
+                .OrderBy(product => product.Id)
+                .Take(RecoveryBatchSize)
+                .Select(product => new ProductSearchDocument
+                {
+                    Id = product.Id,
+                    CategoryId = product.CategoryId,
+                    Name = product.Name,
+                    Description = product.Description,
+                    Price = (double)product.Price,
+                    UpdatedAtUtc = product.UpdatedAtUtc
+                })
+                .ToListAsync(cancellationToken);
+
+            if (products.Count == 0)
+            {
+                break;
+            }
+
+            var response = await client.IndexManyAsync(products, IndexName, cancellationToken);
             EnsureSuccess(response);
+
+            if (response.Errors)
+            {
+                throw new InvalidOperationException("Elasticsearch bulk indexing failed during product search recovery.");
+            }
+
+            indexedCount += products.Count;
+            lastProductId = products[^1].Id;
         }
 
         availabilityState.MarkAvailable();
-        logger.LogInformation("Rebuilt Elasticsearch product index with {ProductCount} documents", products.Count);
+        logger.LogInformation("Rebuilt Elasticsearch product index with {ProductCount} documents", indexedCount);
     }
 
     public async Task UpsertAsync(long productId, CancellationToken cancellationToken)
@@ -707,36 +727,5 @@ public sealed class ElasticsearchProductSearchIndex(
         public double Price { get; init; }
 
         public DateTime UpdatedAtUtc { get; init; }
-    }
-}
-
-public static class ProductSearchInitializer
-{
-    public static async Task InitializeProductSearchAsync(this IServiceProvider services)
-    {
-        await using var scope = services.CreateAsyncScope();
-        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
-            .CreateLogger("ProductSearchInitializer");
-        var productSearchIndex = scope.ServiceProvider.GetRequiredService<IProductSearchIndex>();
-        var recovery = scope.ServiceProvider.GetRequiredService<IProductSearchIndexRecovery>();
-
-        if (!productSearchIndex.IsEnabled)
-        {
-            logger.LogInformation("Elasticsearch product search is disabled");
-            return;
-        }
-
-        try
-        {
-            await recovery.RecoverAsync(CancellationToken.None);
-        }
-        catch (Exception exception)
-        {
-            var availabilityState = scope.ServiceProvider.GetRequiredService<ProductSearchIndexAvailabilityState>();
-            availabilityState.MarkUnavailable();
-            logger.LogWarning(
-                exception,
-                "Elasticsearch product search initialization failed. The API will continue and fall back to database-backed search while recovery retries in the background.");
-        }
     }
 }

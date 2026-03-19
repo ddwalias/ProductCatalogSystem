@@ -701,10 +701,14 @@
       class="p-4 border-t flex flex-col md:flex-row items-center justify-between gap-4 text-sm bg-muted/10"
     >
       <div class="text-muted-foreground">
-        Showing <span class="font-medium text-foreground"
-          >{productsQuery.data?.items.length ?? 0}</span
-        >
-        of {productsQuery.data?.totalCount ?? 0} total.
+        {#if productsQuery.data?.totalCount && productsQuery.data.totalCount > 0}
+          Showing <span class="font-medium text-foreground"
+            >{cursorHistory.length * pageSize + 1}-{cursorHistory.length * pageSize + (productsQuery.data.items.length)}</span
+          >
+          of {productsQuery.data.totalCount} total.
+        {:else}
+          Showing <span class="font-medium text-foreground">0</span> of 0 total.
+        {/if}
       </div>
       <div class="flex items-center gap-2">
         <Button

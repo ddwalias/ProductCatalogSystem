@@ -264,8 +264,8 @@
             </div>
           {:else}
             <div class="p-4">
-              <div class="space-y-1 pb-10 min-h-[50px]"
-                   use:dndzone={{ items: rootCategories, type: 'category', flipDurationMs: 200, dropTargetStyle: { outline: '2px dashed rgba(var(--primary), 0.4)', borderRadius: '0.375rem' } }}
+              <div class="space-y-1 pb-10 min-h-[60px] rounded-md transition-colors"
+                   use:dndzone={{ items: rootCategories, type: 'category', flipDurationMs: 200, dropTargetStyle: { outline: '2px solid hsl(var(--primary))', outlineOffset: '2px', background: 'hsl(var(--primary) / 0.1)', borderRadius: '0.375rem' } }}
                    onconsider={handleRootConsider}
                    onfinalize={handleRootFinalize}>
                 {#each rootCategories as category (category.id)}
@@ -279,6 +279,9 @@
                     />
                   </div>
                 {/each}
+                {#if rootCategories.length === 0}
+                  <div class="text-sm text-muted-foreground/50 text-center py-4 pointer-events-none select-none">Drop root categories here...</div>
+                {/if}
               </div>
             </div>
           {/if}

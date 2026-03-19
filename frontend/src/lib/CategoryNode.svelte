@@ -44,7 +44,7 @@
        tabindex="0">
     
     <div class="flex items-center gap-2 overflow-hidden" style="padding-left: {depth * 1.2}rem;">
-      <div class="cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-foreground transition-colors p-0.5">
+      <div class="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-foreground transition-colors p-0.5">
         <GripVertical class="h-4 w-4" />
       </div>
 
@@ -92,8 +92,8 @@
   {#if isOpen}
     <div transition:slide={{ duration: 150 }} class="relative mt-0.5">
       <div class="absolute top-0 bottom-0 border-l border-border/60 pointer-events-none" style="left: {depth * 1.2 + 0.6 + 0.5 + 1.2}rem;"></div>
-      <div class="flex flex-col gap-0.5 min-h-[10px]"
-           use:dndzone={{ items: childrenItems, type: 'category', flipDurationMs: 200, dropTargetStyle: { outline: '2px dashed rgba(var(--primary), 0.4)', borderRadius: '0.375rem' } }}
+      <div class="flex flex-col gap-1 min-h-[30px] rounded-md transition-colors"
+           use:dndzone={{ items: childrenItems, type: 'category', flipDurationMs: 200, dropTargetStyle: { outline: '2px solid hsl(var(--primary))', outlineOffset: '2px', background: 'hsl(var(--primary) / 0.1)', borderRadius: '0.375rem' } }}
            onconsider={handleConsider}
            onfinalize={handleFinalize}>
         {#each childrenItems as child (child.id)}
@@ -108,6 +108,9 @@
             />
           </div>
         {/each}
+        {#if childrenItems.length === 0}
+          <div class="text-[10px] text-muted-foreground/50 uppercase tracking-widest pl-8 py-1 pointer-events-none select-none">Drop nested items here...</div>
+        {/if}
       </div>
     </div>
   {/if}

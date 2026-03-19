@@ -59,6 +59,7 @@ public sealed class ElasticsearchProductSearchIndex(
     private const string PrefixAnalyzerName = "catalog_prefix";
     private const string InfixAnalyzerName = "catalog_infix";
     private const string FoldedNormalizerName = "catalog_folded";
+    private const int ClusterHealthTimeoutSeconds = 60;
 
     public bool IsEnabled => true;
 
@@ -135,6 +136,7 @@ public sealed class ElasticsearchProductSearchIndex(
 
     public async Task RebuildAsync(CancellationToken cancellationToken)
     {
+        await WaitForClusterReadyAsync(cancellationToken);
         await RecreateIndexAsync(cancellationToken);
 
         var products = await dbContext.Products
@@ -201,9 +203,12 @@ public sealed class ElasticsearchProductSearchIndex(
 
     private async Task EnsureIndexExistsAsync(CancellationToken cancellationToken)
     {
+        await WaitForClusterReadyAsync(cancellationToken);
+
         var existsResponse = await client.Indices.ExistsAsync(IndexName, cancellationToken);
         if (existsResponse.Exists)
         {
+            await WaitForIndexReadyAsync(cancellationToken);
             return;
         }
 
@@ -409,7 +414,8 @@ public sealed class ElasticsearchProductSearchIndex(
             {
               "settings": {
                 "index": {
-                  "max_ngram_diff": 20
+                  "max_ngram_diff": 20,
+                  "number_of_replicas": 0
                 },
                 "analysis": {
                   "normalizer": {
@@ -498,6 +504,49 @@ public sealed class ElasticsearchProductSearchIndex(
             cancellationToken);
 
         EnsureSuccess(response);
+        await WaitForIndexReadyAsync(cancellationToken);
+    }
+
+    private async Task WaitForClusterReadyAsync(CancellationToken cancellationToken)
+    {
+        var endpoint = new EndpointPath(
+            Elastic.Transport.HttpMethod.GET,
+            $"/_cluster/health?wait_for_status=yellow&wait_for_no_relocating_shards=true&timeout={ClusterHealthTimeoutSeconds}s");
+
+        var response = await client.Transport.RequestAsync<StringResponse>(
+            endpoint,
+            null,
+            null,
+            null,
+            cancellationToken);
+
+        EnsureSuccess(response);
+
+        if (response.Body.Contains("\"timed_out\":true", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Elasticsearch cluster health wait timed out: {response.Body}");
+        }
+    }
+
+    private async Task WaitForIndexReadyAsync(CancellationToken cancellationToken)
+    {
+        var endpoint = new EndpointPath(
+            Elastic.Transport.HttpMethod.GET,
+            $"/_cluster/health/{IndexName}?wait_for_status=yellow&wait_for_no_relocating_shards=true&timeout={ClusterHealthTimeoutSeconds}s");
+
+        var response = await client.Transport.RequestAsync<StringResponse>(
+            endpoint,
+            null,
+            null,
+            null,
+            cancellationToken);
+
+        EnsureSuccess(response);
+
+        if (response.Body.Contains("\"timed_out\":true", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Elasticsearch index health wait timed out for '{IndexName}': {response.Body}");
+        }
     }
 
     private static void EnsureSuccess(StringResponse response)
@@ -540,6 +589,15 @@ public static class ProductSearchInitializer
             return;
         }
 
-        await productSearchIndex.RebuildAsync(CancellationToken.None);
+        try
+        {
+            await productSearchIndex.RebuildAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Elasticsearch product search initialization failed. The API will continue and fall back to database-backed search where possible.");
+        }
     }
 }

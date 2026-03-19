@@ -19,7 +19,8 @@ public interface IProductReader
 
 public sealed class ProductReader(
     CatalogDbContext dbContext,
-    IProductSearchIndex productSearchIndex) : IProductReader
+    IProductSearchIndex productSearchIndex,
+    ILogger<ProductReader> logger) : IProductReader
 {
     public async Task<PagedResult<ProductListItemDto>> GetProductsAsync(ProductListQuery query, CancellationToken cancellationToken)
     {
@@ -27,7 +28,17 @@ public sealed class ProductReader(
 
         if (!string.IsNullOrWhiteSpace(query.Query) && productSearchIndex.IsEnabled)
         {
-            return await GetProductsFromSearchIndexAsync(query, paging, cancellationToken);
+            try
+            {
+                return await GetProductsFromSearchIndexAsync(query, paging, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Falling back to database product search for query '{Query}' because Elasticsearch is unavailable",
+                    query.Query);
+            }
         }
 
         var products = dbContext.Products.AsNoTracking();
@@ -82,26 +93,36 @@ public sealed class ProductReader(
 
         if (productSearchIndex.IsEnabled)
         {
-            var productIds = await productSearchIndex.AutocompleteAsync(normalizedQuery, normalizedLimit, cancellationToken);
-            if (productIds.Count == 0)
+            try
             {
-                return [];
+                var productIds = await productSearchIndex.AutocompleteAsync(normalizedQuery, normalizedLimit, cancellationToken);
+                if (productIds.Count == 0)
+                {
+                    return [];
+                }
+
+                var productsById = await dbContext.Products
+                    .AsNoTracking()
+                    .Where(product => productIds.Contains(product.Id))
+                    .Select(product => new ProductAutocompleteItemDto(
+                        product.Id,
+                        product.Name,
+                        product.Category.Name,
+                        product.PrimaryImageUrl))
+                    .ToDictionaryAsync(product => product.Id, cancellationToken);
+
+                return productIds
+                    .Where(productsById.ContainsKey)
+                    .Select(productId => productsById[productId])
+                    .ToList();
             }
-
-            var productsById = await dbContext.Products
-                .AsNoTracking()
-                .Where(product => productIds.Contains(product.Id))
-                .Select(product => new ProductAutocompleteItemDto(
-                    product.Id,
-                    product.Name,
-                    product.Category.Name,
-                    product.PrimaryImageUrl))
-                .ToDictionaryAsync(product => product.Id, cancellationToken);
-
-            return productIds
-                .Where(productsById.ContainsKey)
-                .Select(productId => productsById[productId])
-                .ToList();
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Falling back to database autocomplete for query '{Query}' because Elasticsearch is unavailable",
+                    normalizedQuery);
+            }
         }
 
         var products = dbContext.Products.AsNoTracking();

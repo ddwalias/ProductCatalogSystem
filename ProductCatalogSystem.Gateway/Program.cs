@@ -2,6 +2,11 @@ using Yarp.ReverseProxy.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpsRedirection(options =>
+{
+    options.HttpsPort = 443;
+});
+
 builder.Services.AddReverseProxy()
     .LoadFromMemory(
         [
@@ -29,6 +34,12 @@ builder.Services.AddReverseProxy()
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
 app.MapReverseProxy();
 
 app.Run();

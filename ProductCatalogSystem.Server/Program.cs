@@ -13,7 +13,9 @@ var hasElasticsearchConnection =
     !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("elasticsearch")) ||
     !string.IsNullOrWhiteSpace(builder.Configuration["Aspire:Elastic:Clients:Elasticsearch:Endpoint"]);
 var hasMessageTransport = !string.IsNullOrWhiteSpace(catalogConnectionString);
-var shouldSeedCatalog = builder.Environment.IsDevelopment() && !builder.Configuration.GetValue<bool>("SkipCatalogInitialization");
+var shouldSeedCatalog =
+    !builder.Configuration.GetValue<bool>("SkipCatalogInitialization") &&
+    (builder.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("SeedCatalogOnStartup"));
 
 builder.AddServiceDefaults();
 if (hasElasticsearchConnection)

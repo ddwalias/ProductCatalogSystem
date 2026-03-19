@@ -18,21 +18,26 @@ var server = builder.AddProject<Projects.ProductCatalogSystem_Server>("server")
     .WithHttpHealthCheck("/health")
     .PublishAsDockerComposeService((_, service) => service.Name = "server");
 
-var webfrontend = builder.AddViteApp("webfrontend", "../frontend")
-    .WaitFor(server);
-
 if (builder.ExecutionContext.IsPublishMode)
 {
-    server.PublishWithContainerFiles(webfrontend, "./wwwroot");
+    var webfrontend = builder.AddDockerfile("webfrontend", "../frontend")
+        .WithHttpEndpoint(targetPort: 3000, name: "http")
+        .WaitFor(server)
+        .PublishAsDockerComposeService((_, service) => service.Name = "webfrontend");
 
     builder.AddProject<Projects.ProductCatalogSystem_Gateway>("gateway")
         .WithReference(server)
+        .WithReference(webfrontend.GetEndpoint("http"))
         .WithExternalHttpEndpoints()
         .WaitFor(server)
+        .WaitFor(webfrontend)
         .PublishAsDockerComposeService((_, service) => service.Name = "gateway");
 }
 else
 {
+    var webfrontend = builder.AddViteApp("webfrontend", "../frontend")
+        .WaitFor(server);
+
     builder.AddProject<Projects.ProductCatalogSystem_Gateway>("gateway")
         .WithReference(server)
         .WithReference(webfrontend)

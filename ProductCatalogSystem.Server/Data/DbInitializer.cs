@@ -20,6 +20,34 @@ public static class DbInitializer
         "ivory"
     ];
 
+    private static readonly string[] UsagePalette =
+    [
+        "focused desk setups",
+        "hybrid team routines",
+        "travel-heavy workflows",
+        "creator stations",
+        "quiet home offices",
+        "studio corners",
+        "daily carry kits",
+        "shared meeting spaces",
+        "compact apartments",
+        "customer-facing counters"
+    ];
+
+    private static readonly string[] PersonaPalette =
+    [
+        "operations leads",
+        "design teams",
+        "remote operators",
+        "content producers",
+        "office managers",
+        "analysts",
+        "project coordinators",
+        "travelers",
+        "wellness-minded teams",
+        "support staff"
+    ];
+
     private static readonly CategorySeed[] CategorySeeds =
     [
         new(
@@ -40,7 +68,8 @@ public static class DbInitializer
                 "Signal Booster",
                 "Compact Scanner",
                 "Field Recorder",
-                "Device Stand"
+                "Device Stand",
+                "Pocket Projector"
             ]),
         new(
             Name: "Audio",
@@ -60,7 +89,8 @@ public static class DbInitializer
                 "Conference Speaker",
                 "Desktop DAC",
                 "Sound Bar",
-                "Bass Module"
+                "Bass Module",
+                "Studio Mixer"
             ]),
         new(
             Name: "Peripherals",
@@ -80,7 +110,8 @@ public static class DbInitializer
                 "Laptop Stand",
                 "USB Switch",
                 "Webcam Light",
-                "Desk Mat"
+                "Desk Mat",
+                "Macro Keypad"
             ]),
         new(
             Name: "Smart Home",
@@ -100,7 +131,8 @@ public static class DbInitializer
                 "Scene Controller",
                 "Air Quality Monitor",
                 "Leak Detector",
-                "Presence Sensor"
+                "Presence Sensor",
+                "Smart Thermostat"
             ]),
         new(
             Name: "Cameras",
@@ -120,7 +152,8 @@ public static class DbInitializer
                 "Light Panel",
                 "Field Monitor",
                 "Camera Backpack",
-                "Battery Grip"
+                "Battery Grip",
+                "Wireless Flash"
             ]),
         new(
             Name: "Office",
@@ -140,7 +173,8 @@ public static class DbInitializer
                 "Standing Mat",
                 "Phone Stand",
                 "Note Organizer",
-                "Reference Shelf"
+                "Reference Shelf",
+                "Planner Folio"
             ]),
         new(
             Name: "Furniture",
@@ -160,7 +194,8 @@ public static class DbInitializer
                 "Monitor Shelf",
                 "Mobile Pedestal",
                 "Focus Booth Table",
-                "Foot Rest"
+                "Foot Rest",
+                "Storage Bench"
             ]),
         new(
             Name: "Lighting",
@@ -180,7 +215,8 @@ public static class DbInitializer
                 "Wall Sconce",
                 "Reading Light",
                 "Studio Lamp",
-                "Ambient Strip"
+                "Ambient Strip",
+                "Clamp Lamp"
             ]),
         new(
             Name: "Organization",
@@ -200,7 +236,8 @@ public static class DbInitializer
                 "Supply Caddy",
                 "Cable Sleeve Pack",
                 "Magazine Holder",
-                "Desktop Catchall"
+                "Desktop Catchall",
+                "Desktop Locker"
             ]),
         new(
             Name: "Lifestyle",
@@ -220,47 +257,8 @@ public static class DbInitializer
                 "Crossbody Pack",
                 "City Umbrella",
                 "Tech Pouch",
-                "Everyday Sling"
-            ]),
-        new(
-            Name: "Travel Gear",
-            Description: "Move-ready gear for mobile teams and frequent travel.",
-            ParentName: "Lifestyle",
-            DisplayOrder: 10,
-            Collection: "Waypoint",
-            HeroImageUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
-            Focus: "frictionless trips and carry setups",
-            ProductLabels:
-            [
-                "Carry-On Case",
-                "Passport Folio",
-                "Packable Daypack",
-                "Luggage Tracker",
-                "Neck Pillow",
-                "Compression Cube",
-                "Travel Bottle Set",
-                "Garment Sleeve",
-                "Transit Organizer"
-            ]),
-        new(
-            Name: "Wellness",
-            Description: "Recovery, hydration, and supportive comfort products.",
-            ParentName: "Lifestyle",
-            DisplayOrder: 20,
-            Collection: "Bloom",
-            HeroImageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a",
-            Focus: "better breaks and healthier routines",
-            ProductLabels:
-            [
-                "Stretch Band Set",
-                "Massage Roller",
-                "Desk Cycle",
-                "Balance Cushion",
-                "Meditation Timer",
-                "Recovery Ball Set",
-                "Hydration Bottle",
-                "Warm-Up Pad",
-                "Breathwork Light"
+                "Everyday Sling",
+                "Bottle Sling"
             ])
     ];
 
@@ -458,17 +456,29 @@ public static class DbInitializer
                 yield return new ProductSeed(
                     CategoryName: categorySeed.Name,
                     Name: name,
-                    Description: $"{name} is tuned for {categorySeed.Focus} with a balanced, production-minded spec set for {categorySeed.Name.ToLowerInvariant()} buyers.",
+                    Description: BuildProductDescription(categorySeed, label, index),
                     Price: price,
                     InventoryOnHand: inventory,
-                    PrimaryImageUrl: categorySeed.HeroImageUrl,
+                    PrimaryImageUrl: BuildProductImageUrl(name),
                     CustomAttributesJson: BuildAttributesJson(categorySeed, index));
             }
         }
     }
 
+    private static string BuildProductDescription(CategorySeed categorySeed, string label, int index)
+    {
+        var usage = UsagePalette[(categorySeed.DisplayOrder + index) % UsagePalette.Length];
+        var persona = PersonaPalette[(index + categorySeed.Collection.Length) % PersonaPalette.Length];
+
+        return $"{categorySeed.Collection} {label} is built for {categorySeed.Focus}, giving {persona} a cleaner fit for {usage}.";
+    }
+
+    private static string BuildProductImageUrl(string productName)
+        => $"https://picsum.photos/seed/{Uri.EscapeDataString(productName.ToLowerInvariant().Replace(' ', '-'))}/1200/900";
+
     private static string BuildAttributesJson(CategorySeed categorySeed, int index)
     {
+        var label = categorySeed.ProductLabels[index];
         var attributes = new JsonObject
         {
             ["collection"] = categorySeed.Collection,
@@ -477,7 +487,11 @@ public static class DbInitializer
             ["bundleReady"] = index % 2 == 0,
             ["profile"] = categorySeed.Focus,
             ["warrantyYears"] = 1 + (index % 3),
-            ["category"] = categorySeed.Name
+            ["category"] = categorySeed.Name,
+            ["label"] = label,
+            ["usage"] = UsagePalette[(categorySeed.DisplayOrder + index) % UsagePalette.Length],
+            ["persona"] = PersonaPalette[(index + categorySeed.Collection.Length) % PersonaPalette.Length],
+            ["sku"] = $"{categorySeed.Collection[..Math.Min(3, categorySeed.Collection.Length)].ToUpperInvariant()}-{categorySeed.DisplayOrder:00}-{index + 1:00}"
         };
 
         return attributes.ToJsonString();

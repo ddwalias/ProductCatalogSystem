@@ -9,7 +9,6 @@ public static class EndpointValidationExtensions
         this IEnumerable<ValidationFailure> failures)
     {
         return failures
-            .Where(failure => failure is not null)
             .GroupBy(failure => ToContractFieldName(failure.PropertyName))
             .ToDictionary(
                 group => group.Key,

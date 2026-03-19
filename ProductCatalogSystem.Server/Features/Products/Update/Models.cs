@@ -5,24 +5,24 @@ namespace ProductCatalogSystem.Server.Features.Products.Update;
 
 public sealed class UpdateProductRequest
 {
-    private string? name;
-    private string? description;
-    private decimal? price;
-    private int? inventoryOnHand;
-    private long? categoryId;
-    private string? primaryImageUrl;
-    private JsonObject? customAttributes;
+    private string? _name;
+    private string? _description;
+    private decimal? _price;
+    private int? _inventoryOnHand;
+    private long? _categoryId;
+    private string? _primaryImageUrl;
+    private JsonObject? _customAttributes;
 
     [JsonIgnore]
     public bool HasName { get; private set; }
 
     public string? Name
     {
-        get => name;
+        get => _name;
         set
         {
             HasName = true;
-            name = value;
+            _name = value;
         }
     }
 
@@ -31,11 +31,11 @@ public sealed class UpdateProductRequest
 
     public string? Description
     {
-        get => description;
+        get => _description;
         set
         {
             HasDescription = true;
-            description = value;
+            _description = value;
         }
     }
 
@@ -44,11 +44,11 @@ public sealed class UpdateProductRequest
 
     public decimal? Price
     {
-        get => price;
+        get => _price;
         set
         {
             HasPrice = true;
-            price = value;
+            _price = value;
         }
     }
 
@@ -57,11 +57,11 @@ public sealed class UpdateProductRequest
 
     public int? InventoryOnHand
     {
-        get => inventoryOnHand;
+        get => _inventoryOnHand;
         set
         {
             HasInventoryOnHand = true;
-            inventoryOnHand = value;
+            _inventoryOnHand = value;
         }
     }
 
@@ -70,11 +70,11 @@ public sealed class UpdateProductRequest
 
     public long? CategoryId
     {
-        get => categoryId;
+        get => _categoryId;
         set
         {
             HasCategoryId = true;
-            categoryId = value;
+            _categoryId = value;
         }
     }
 
@@ -83,11 +83,11 @@ public sealed class UpdateProductRequest
 
     public string? PrimaryImageUrl
     {
-        get => primaryImageUrl;
+        get => _primaryImageUrl;
         set
         {
             HasPrimaryImageUrl = true;
-            primaryImageUrl = value;
+            _primaryImageUrl = value;
         }
     }
 
@@ -96,11 +96,11 @@ public sealed class UpdateProductRequest
 
     public JsonObject? CustomAttributes
     {
-        get => customAttributes;
+        get => _customAttributes;
         set
         {
             HasCustomAttributes = true;
-            customAttributes = value;
+            _customAttributes = value;
         }
     }
 

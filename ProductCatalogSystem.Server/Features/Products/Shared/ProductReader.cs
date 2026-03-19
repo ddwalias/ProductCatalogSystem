@@ -78,8 +78,6 @@ public sealed class ProductReader(
 
         return new PagedResult<ProductListItemDto>(
             items,
-            paging.PageSize,
-            totalCount,
             paging.Cursor,
             hasMore ? ProductListCursor.EncodeDatabaseCursor(query, items[^1]) : null);
     }
@@ -286,8 +284,6 @@ public sealed class ProductReader(
         {
             return new PagedResult<ProductListItemDto>(
                 [],
-                paging.PageSize,
-                0,
                 paging.Cursor,
                 null);
         }
@@ -317,8 +313,6 @@ public sealed class ProductReader(
         var totalCount = (int)Math.Min(searchResult.TotalCount, int.MaxValue);
         return new PagedResult<ProductListItemDto>(
             orderedItems,
-            paging.PageSize,
-            totalCount,
             paging.Cursor,
             searchResult.NextCursor);
     }

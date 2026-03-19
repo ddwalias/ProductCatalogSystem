@@ -56,7 +56,6 @@ public static class DbInitializer
             ParentName: null,
             DisplayOrder: 10,
             Collection: "Vertex",
-            HeroImageUrl: "https://images.unsplash.com/photo-1519389950473-47ba0277781c",
             Focus: "connected daily setups",
             ProductLabels:
             [
@@ -77,7 +76,6 @@ public static class DbInitializer
             ParentName: "Electronics",
             DisplayOrder: 10,
             Collection: "Auraline",
-            HeroImageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e",
             Focus: "clear listening and studio-ready playback",
             ProductLabels:
             [
@@ -98,7 +96,6 @@ public static class DbInitializer
             ParentName: "Electronics",
             DisplayOrder: 20,
             Collection: "Keystone",
-            HeroImageUrl: "https://images.unsplash.com/photo-1511467687858-23d96c32e4ae",
             Focus: "faster desk workflows",
             ProductLabels:
             [
@@ -119,7 +116,6 @@ public static class DbInitializer
             ParentName: "Electronics",
             DisplayOrder: 30,
             Collection: "Nexa",
-            HeroImageUrl: "https://images.unsplash.com/photo-1558002038-1055907df827",
             Focus: "automated rooms and ambient control",
             ProductLabels:
             [
@@ -140,7 +136,6 @@ public static class DbInitializer
             ParentName: "Electronics",
             DisplayOrder: 40,
             Collection: "Framecraft",
-            HeroImageUrl: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32",
             Focus: "fast capture and creator workflows",
             ProductLabels:
             [
@@ -161,7 +156,6 @@ public static class DbInitializer
             ParentName: null,
             DisplayOrder: 20,
             Collection: "Northline",
-            HeroImageUrl: "https://images.unsplash.com/photo-1497366754035-f200968a6e72",
             Focus: "calm and efficient workdays",
             ProductLabels:
             [
@@ -182,7 +176,6 @@ public static class DbInitializer
             ParentName: "Office",
             DisplayOrder: 10,
             Collection: "Atlas",
-            HeroImageUrl: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85",
             Focus: "comfortable long-session ergonomics",
             ProductLabels:
             [
@@ -203,7 +196,6 @@ public static class DbInitializer
             ParentName: "Office",
             DisplayOrder: 20,
             Collection: "Luma",
-            HeroImageUrl: "https://images.unsplash.com/photo-1513694203232-719a280e022f",
             Focus: "layered lighting moods",
             ProductLabels:
             [
@@ -224,7 +216,6 @@ public static class DbInitializer
             ParentName: "Office",
             DisplayOrder: 30,
             Collection: "Orderly",
-            HeroImageUrl: "https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b",
             Focus: "cleaner desks and clearer routines",
             ProductLabels:
             [
@@ -245,7 +236,6 @@ public static class DbInitializer
             ParentName: null,
             DisplayOrder: 30,
             Collection: "Drift",
-            HeroImageUrl: "https://images.unsplash.com/photo-1512436991641-6745cdb1723f",
             Focus: "lighter daily rituals",
             ProductLabels:
             [
@@ -501,7 +491,6 @@ public static class DbInitializer
         string? ParentName,
         int DisplayOrder,
         string Collection,
-        string HeroImageUrl,
         string Focus,
         string[] ProductLabels);
 

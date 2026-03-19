@@ -22,19 +22,6 @@ public sealed class InventoryTransactionInterceptor : SaveChangesInterceptor
         return ValueTask.FromResult(result);
     }
 
-    public override int SavedChanges(SaveChangesCompletedEventData eventData, int result)
-    {
-        return result;
-    }
-
-    public override ValueTask<int> SavedChangesAsync(
-        SaveChangesCompletedEventData eventData,
-        int result,
-        CancellationToken cancellationToken = default)
-    {
-        return ValueTask.FromResult(result);
-    }
-
     private static void ApplyInventoryTransactions(DbContext? context)
     {
         if (context is CatalogDbContext catalogDbContext)

@@ -2,12 +2,6 @@ using ProductCatalogSystem.Server.Domain;
 
 namespace ProductCatalogSystem.Server.Features.Categories.Shared;
 
-public sealed record CategorySummaryDto(
-    long Id,
-    string Name,
-    CategoryStatus Status,
-    decimal DisplayOrder);
-
 public sealed record CategoryTreeItemDto(
     long Id,
     long? ParentCategoryId,

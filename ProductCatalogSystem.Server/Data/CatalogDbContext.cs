@@ -8,8 +8,8 @@ namespace ProductCatalogSystem.Server.Data;
 
 public sealed class CatalogDbContext : DbContext
 {
-    private readonly IProductSearchMessagePublisher productSearchMessagePublisher;
-    private readonly ProductSearchChangeBuffer productSearchChanges = new();
+    private readonly IProductSearchMessagePublisher _productSearchMessagePublisher;
+    private readonly ProductSearchChangeBuffer _productSearchChanges = new();
 
     public CatalogDbContext(DbContextOptions<CatalogDbContext> options)
         : this(options, new NoOpProductSearchMessagePublisher())
@@ -21,7 +21,7 @@ public sealed class CatalogDbContext : DbContext
         IProductSearchMessagePublisher productSearchMessagePublisher)
         : base(options)
     {
-        this.productSearchMessagePublisher = productSearchMessagePublisher;
+        this._productSearchMessagePublisher = productSearchMessagePublisher;
         ChangeTracker.CascadeDeleteTiming = CascadeTiming.OnSaveChanges;
         ChangeTracker.DeleteOrphansTiming = CascadeTiming.OnSaveChanges;
     }
@@ -51,12 +51,12 @@ public sealed class CatalogDbContext : DbContext
 
     internal void CaptureProductSearchChanges()
     {
-        if (productSearchChanges.IsPublishing)
+        if (_productSearchChanges.IsPublishing)
         {
             return;
         }
 
-        productSearchChanges.ReplacePending(GetSearchTrackedProductEntries().Select(CreateProductSearchChange));
+        _productSearchChanges.ReplacePending(GetSearchTrackedProductEntries().Select(CreateProductSearchChange));
     }
 
     internal void PublishPendingProductSearchMessages()
@@ -64,7 +64,7 @@ public sealed class CatalogDbContext : DbContext
 
     internal async Task PublishPendingProductSearchMessagesAsync(CancellationToken cancellationToken)
     {
-        if (!productSearchChanges.TryBeginPublishing(out var changes))
+        if (!_productSearchChanges.TryBeginPublishing(out var changes))
         {
             return;
         }
@@ -83,13 +83,13 @@ public sealed class CatalogDbContext : DbContext
         }
         finally
         {
-            productSearchChanges.EndPublishing();
+            _productSearchChanges.EndPublishing();
         }
     }
 
     internal void ClearPendingProductSearchChanges()
     {
-        productSearchChanges.Clear();
+        _productSearchChanges.Clear();
     }
 
     private IEnumerable<EntityEntry<Product>> GetInventoryTrackedProductEntries()
@@ -171,8 +171,8 @@ public sealed class CatalogDbContext : DbContext
         CancellationToken cancellationToken)
     {
         return change.Kind == ProductSearchChangeKind.Delete
-            ? productSearchMessagePublisher.PublishDeleteAsync(change.Product.Id, cancellationToken)
-            : productSearchMessagePublisher.PublishUpsertAsync(change.Product.Id, cancellationToken);
+            ? _productSearchMessagePublisher.PublishDeleteAsync(change.Product.Id, cancellationToken)
+            : _productSearchMessagePublisher.PublishUpsertAsync(change.Product.Id, cancellationToken);
     }
 
     private sealed record ProductSearchChange(Product Product, ProductSearchChangeKind Kind);
@@ -185,26 +185,26 @@ public sealed class CatalogDbContext : DbContext
 
     private sealed class ProductSearchChangeBuffer
     {
-        private readonly List<ProductSearchChange> pending = [];
+        private readonly List<ProductSearchChange> _pending = [];
 
         public bool IsPublishing { get; private set; }
 
         public void ReplacePending(IEnumerable<ProductSearchChange> changes)
         {
-            pending.Clear();
-            pending.AddRange(changes);
+            _pending.Clear();
+            _pending.AddRange(changes);
         }
 
         public bool TryBeginPublishing(out ProductSearchChange[] changes)
         {
-            if (IsPublishing || pending.Count == 0)
+            if (IsPublishing || _pending.Count == 0)
             {
                 changes = [];
                 return false;
             }
 
-            changes = pending.ToArray();
-            pending.Clear();
+            changes = _pending.ToArray();
+            _pending.Clear();
             IsPublishing = true;
             return true;
         }
@@ -216,7 +216,7 @@ public sealed class CatalogDbContext : DbContext
 
         public void Clear()
         {
-            pending.Clear();
+            _pending.Clear();
             IsPublishing = false;
         }
     }

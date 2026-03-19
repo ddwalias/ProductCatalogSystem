@@ -87,17 +87,23 @@ public sealed class CategoryWriter(
             return new ServiceResult<CategoryTreeItemDto>(ResultStatus.Conflict, Message: "The category has changed since it was last loaded.");
         }
 
-        var validationErrors = await ValidateCategoryRequestAsync(request.ParentCategoryId, request.DisplayOrder, id, cancellationToken);
+        var updatedName = request.HasName ? request.Name!.Trim() : category.Name;
+        var updatedDescription = request.HasDescription ? request.Description?.Trim() : category.Description;
+        var updatedParentCategoryId = request.HasParentCategoryId ? request.ParentCategoryId : category.ParentCategoryId;
+        var updatedStatus = request.HasStatus ? request.Status!.Value : category.Status;
+        var updatedDisplayOrder = request.HasDisplayOrder ? request.DisplayOrder!.Value : category.DisplayOrder;
+
+        var validationErrors = await ValidateCategoryRequestAsync(updatedParentCategoryId, updatedDisplayOrder, id, cancellationToken);
         if (validationErrors.Count > 0)
         {
             return new ServiceResult<CategoryTreeItemDto>(ResultStatus.ValidationFailed, Errors: validationErrors);
         }
 
-        category.Name = request.Name.Trim();
-        category.Description = request.Description?.Trim();
-        category.ParentCategoryId = request.ParentCategoryId;
-        category.Status = request.Status;
-        category.DisplayOrder = request.DisplayOrder;
+        category.Name = updatedName;
+        category.Description = updatedDescription;
+        category.ParentCategoryId = updatedParentCategoryId;
+        category.Status = updatedStatus;
+        category.DisplayOrder = updatedDisplayOrder;
 
         try
         {

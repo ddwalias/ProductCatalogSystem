@@ -17,6 +17,20 @@ builder.Services.AddReverseProxy()
         [
             new RouteConfig
             {
+                RouteId = "server-health",
+                ClusterId = "server",
+                Order = -100,
+                Match = new RouteMatch { Path = "/api/health" },
+                Transforms =
+                [
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["PathSet"] = "/health"
+                    }
+                ]
+            },
+            new RouteConfig
+            {
                 RouteId = "server-api",
                 ClusterId = "server",
                 Match = new RouteMatch { Path = "/api/{**catch-all}" }

@@ -155,7 +155,7 @@ export function updateCategory(id: number, payload: CategoryUpdatePayload): Prom
 }
 
 export async function getHealth(): Promise<string> {
-  const response = await fetch('/health', {
+  const response = await fetch('/api/health', {
     headers: {
       Accept: 'text/plain',
     },

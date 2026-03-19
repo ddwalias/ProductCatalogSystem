@@ -22,7 +22,9 @@ builder.Services.AddReverseProxy()
         [
             BuildCluster("server", ResolveServiceAddress(builder.Configuration, "server", "https")
                 ?? ResolveServiceAddress(builder.Configuration, "server", "http")),
-            BuildCluster("webfrontend", ResolveServiceAddress(builder.Configuration, "webfrontend", "http"))
+            BuildCluster("webfrontend", ResolveServiceAddress(builder.Configuration, "webfrontend", "http")
+                ?? ResolveServiceAddress(builder.Configuration, "server", "https")
+                ?? ResolveServiceAddress(builder.Configuration, "server", "http"))
         ]);
 
 var app = builder.Build();
